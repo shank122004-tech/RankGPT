@@ -19,8 +19,8 @@ const FREE_IMAGE_LIMIT = 5;
 const FREE_PDF_LIMIT = 2;
 
 // ===== CASHFREE CONFIG =====
-const CASHFREE_APP_ID = 'AppID12313568ac3cf01b86d06d981446531321'; // keep server-side in production
-const CASHFREE_SECRET = 'cfsk_ma_prod_865eae796bd15e735eb003b2a00e2e96_23d175a3';
+const CASHFREE_APP_ID = ''; // keep server-side in production
+const CASHFREE_SECRET = '';
 const PREMIUM_PRICE = 199;
 
 // ===== STATE =====
