@@ -3,16 +3,11 @@
 // ===== CONFIGURATION =====
 
 
-// ── API base: auto-detect environment ───────────────────────
-// GitHub Pages / Live Server → hit deployed Firebase functions directly
-// Firebase Hosting (rankgpt-f8a64.web.app) → use relative rewrites
-const _IS_FIREBASE_HOSTING = location.hostname.includes('web.app') || location.hostname.includes('firebaseapp.com');
-const API_BASE = _IS_FIREBASE_HOSTING ? '' : 'https://rankgpt-f8a64.web.app';
-
-const DEEPSEEK_API_URL   = API_BASE + '/api/deepseek';
-const GEMINI_API_URL     = API_BASE + '/api/gemini';
-const CASHFREE_ORDER_URL = API_BASE + '/api/create-cashfree-order';
-const VERIFY_PAYMENT_URL = API_BASE + '/api/verify-payment';
+// ── API endpoints: direct Firebase function URLs ─────────────
+const DEEPSEEK_API_URL   = 'https://rankgpt-f8a64.web.app/api/deepseek';
+const GEMINI_API_URL     = 'https://rankgpt-f8a64.web.app/api/gemini';
+const CASHFREE_ORDER_URL = 'https://rankgpt-f8a64.web.app/api/create-cashfree-order';
+const VERIFY_PAYMENT_URL = 'https://rankgpt-f8a64.web.app/api/verify-payment';
 // DeepSeek Configuration
 const DEEPSEEK_MODEL = 'deepseek-chat';
 
