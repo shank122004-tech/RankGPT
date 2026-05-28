@@ -1,13 +1,19 @@
 'use strict';
+// ── SSC PrepAI app.js  v11 ──────────────────────────────────
 
 // ===== CONFIGURATION =====
 
 
-// ── API endpoints: direct Firebase function URLs ─────────────
-const DEEPSEEK_API_URL   = 'https://rankgpt-f8a64.web.app/api/deepseek';
-const GEMINI_API_URL     = 'https://rankgpt-f8a64.web.app/api/gemini';
-const CASHFREE_ORDER_URL = 'https://rankgpt-f8a64.web.app/api/create-cashfree-order';
-const VERIFY_PAYMENT_URL = 'https://rankgpt-f8a64.web.app/api/verify-payment';
+// ── API endpoints ─────────────────────────────────────────────
+const DEEPSEEK_API_URL   = 'https://deepseek-56khnynjia-uc.a.run.app';
+// Use Firebase Hosting rewrite — same-origin, no CORS issues at all.
+// firebase.json maps  /api/gemini  →  geminiVision  function.
+const GEMINI_API_URL     = '/api/gemini';
+const CASHFREE_ORDER_URL =
+'https://createcashfreeorder-56khnynjia-uc.a.run.app';
+
+const VERIFY_PAYMENT_URL =
+'https://verifypayment-56khnynjia-uc.a.run.app';
 // DeepSeek Configuration
 const DEEPSEEK_MODEL = 'deepseek-chat';
 
@@ -513,9 +519,20 @@ function updateStreak() {
 }
 
 // ===== SYSTEM PROMPT =====
+// Grade level determines vocabulary and explanation depth
+function _getGradeLevel(mode) {
+  if (!mode) return null;
+  const match = mode.match(/^class(\d+)/);
+  return match ? parseInt(match[1], 10) : null;
+}
+
 function getSystemPrompt() {
   if (state.noSystemPrompt) return '';
-  const langMap = { hinglish: 'Always respond in Hinglish (Hindi + English mix). Example: "Bhai, yeh formula important hai SSC ke liye!"', hindi: 'Always respond in Hindi (Romanized script).', english: 'Always respond in clear, simple English.' };
+  const langMap = {
+    hinglish: 'Always respond in Hinglish (Hindi + English mix). Example: "Bhai, yeh formula important hai!"',
+    hindi: 'Always respond in Hindi (Romanized script).',
+    english: 'Always respond in clear, simple English.'
+  };
   const modeMap = {
     cgl: 'SSC CGL (Tier 1 & 2: Quant, English, Reasoning, GK)',
     chsl: 'SSC CHSL (10+2 level)',
@@ -539,30 +556,56 @@ function getSystemPrompt() {
     class12_com: 'Class 12 Commerce Board Exam (CBSE/NCERT: Accounts, Business Studies, Economics, Math)',
     class12_arts: 'Class 12 Arts/Humanities Board Exam (CBSE/NCERT: History, Geography, Political Science, Economics)',
   };
-  const wordLimit = state.shortResponseMode ? 120 : 250;
-  const modeDesc = modeMap[state.sscMode] || 'general education';
+
+  const grade = _getGradeLevel(state.sscMode);
   const isClassMode = state.sscMode.startsWith('class');
+  const modeDesc = modeMap[state.sscMode] || 'general education';
+  // Token-saving: shorter word limit for lower grades (they need simpler/shorter answers)
+  const wordLimit = state.shortResponseMode ? 100 : (grade && grade <= 5 ? 150 : grade && grade <= 8 ? 200 : 280);
+
   if (isClassMode) {
-    return `You are PrepAI, an expert tutor for ${modeDesc}.
+    // Grade-appropriate language instruction
+    let gradeStyle = '';
+    if (grade && grade <= 2) {
+      gradeStyle = 'Use VERY simple words, short sentences. Like talking to a 6-7 year old child. Use emojis and fun examples.';
+    } else if (grade && grade <= 5) {
+      gradeStyle = 'Use simple, easy words. Short sentences. Friendly tone like a helpful elder sibling. Use fun real-life examples.';
+    } else if (grade && grade <= 8) {
+      gradeStyle = 'Use clear language suitable for a middle school student. Give relatable examples from daily life.';
+    } else {
+      gradeStyle = 'Use precise academic language suitable for board exam preparation. Give exam-focused answers.';
+    }
+    return `You are PrepAI, a friendly AI tutor for ${modeDesc}.
 ${langMap[state.aiLang]}
+${gradeStyle}
 Rules:
-- Use NCERT/CBSE syllabus as the primary reference
-- Give clear, step-by-step explanations suitable for the grade level
-- Use simple language appropriate for students
+- Always follow NCERT/CBSE syllabus
+- Give step-by-step explanations for math/science
 - Keep responses under ${wordLimit} words
-- End with a memory tip or exam trick
-- For math/science: show step-by-step solutions
-Topics: Follow the official CBSE/NCERT syllabus for this class.`;
+- End with 1 memory tip or fun trick
+Topics: Official CBSE/NCERT curriculum for this class.`;
   }
+
   return `You are PrepAI, an expert SSC exam tutor focused on ${modeDesc}.
 ${langMap[state.aiLang]}
 Rules:
 - Formulas and shortcuts first
 - Use real SSC exam examples
 - Keep responses under ${wordLimit} words
-- End with a quick tip or trick
-- For math: show step-by-step solution
-Topics: Quant (Arithmetic, Algebra, Geometry, Trigonometry), English, Reasoning, GK/Current Affairs.`;
+- End with 1 quick exam tip
+- For math: step-by-step solution
+Topics: Quant, English, Reasoning, GK/Current Affairs.`;
+}
+
+// Returns optimal max_tokens for current mode (saves API cost)
+function getOptimalMaxTokens(hasVision) {
+  const grade = _getGradeLevel(state.sscMode);
+  if (state.shortResponseMode) return 250;
+  if (hasVision) return grade && grade <= 5 ? 400 : 600; // vision needs more tokens
+  if (grade && grade <= 2) return 200;   // Class 1-2: very short answers
+  if (grade && grade <= 5) return 280;   // Class 3-5: short answers
+  if (grade && grade <= 8) return 380;   // Class 6-8: medium answers
+  return 500;                            // Class 9-12 / SSC: full answers
 }
 
 // ===== AI CALLS =====
@@ -608,8 +651,11 @@ async function callDeepSeek(userMessage, chatHistory = []) {
     body: JSON.stringify({
       model: DEEPSEEK_MODEL,
       messages,
-      max_tokens: state.shortResponseMode ? 300 : 800,
-      temperature: 0.7
+      max_tokens: getOptimalMaxTokens(false),
+      temperature: 0.7,
+      mode: state.sscMode,
+      lang: state.aiLang,
+      shortMode: state.shortResponseMode
     })
   });
   
@@ -644,27 +690,35 @@ async function callGeminiVision(userMessage, chatHistory = [], imageBase64Array 
   if (pdfBase64) userParts.push({ inline_data: { mime_type: 'application/pdf', data: pdfBase64 } });
   userParts.push({ text: userMessage });
   const systemPrompt = getSystemPrompt();
-  const body = { 
-    ...(systemPrompt ? { system_instruction: { parts: [{ text: systemPrompt }] } } : {}), 
-    contents: [...recentHistory, { role: 'user', parts: userParts }], 
-    generationConfig: { temperature: 0.7, maxOutputTokens: state.shortResponseMode ? 300 : 800, topP: 0.9 } 
-  };
+ const body = {
+  contents: [
+    ...recentHistory,
+    {
+      role: 'user',
+      parts: userParts
+    }
+  ],
+  mode: state.sscMode,
+  lang: state.aiLang,
+  shortMode: state.shortResponseMode,
+  maxOutputTokens: getOptimalMaxTokens(true)
+};
   
-  const response = await fetch(GEMINI_API_URL, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
-    body: JSON.stringify(body)
-  });
+const response = await fetch(GEMINI_API_URL, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`
+  },
+  body: JSON.stringify(body)
+});
   
   if (!response.ok) { 
     const errData = await response.json().catch(() => ({})); 
     throw new Error(`Gemini Error ${response.status}: ${errData?.error?.message || 'Unknown'}`); 
   }
   const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || 'Sorry, image/PDF analyze nahi ho paya.';
+  return data.text || 'Sorry, image/PDF analyze nahi ho paya.';
 }
 
 // ===== MARKDOWN =====
@@ -886,7 +940,20 @@ function getFollowUpSuggestions(question) {
 // ===== IMAGE HANDLING =====
 function setupImageUpload() {
   if (!dom.imageUploadBtn || !dom.imageInput) return;
-  dom.imageUploadBtn.addEventListener('click', () => dom.imageInput.click());
+
+  // Guard: prevent attaching duplicate listeners if called more than once
+  if (dom.imageUploadBtn._listenerAttached) return;
+  dom.imageUploadBtn._listenerAttached = true;
+
+  dom.imageUploadBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Close submenu, then open file picker
+    const subMenu = document.getElementById('uploadSubMenu');
+    const wrap = document.getElementById('uploadBtnWrap');
+    if (subMenu) subMenu.style.display = 'none';
+    if (wrap) wrap.classList.remove('open');
+    dom.imageInput.click();
+  });
   dom.imageInput.addEventListener('change', handleImageSelect);
 }
 async function handleImageSelect(e) {
@@ -924,8 +991,45 @@ async function compressImage(file) {
 // ===== PDF HANDLING =====
 function setupPdfUpload() {
   if (!dom.pdfUploadBtn || !dom.pdfInput) return;
-  dom.pdfUploadBtn.addEventListener('click', () => dom.pdfInput.click());
+
+  // Guard: prevent duplicate listeners
+  if (dom.pdfUploadBtn._listenerAttached) return;
+  dom.pdfUploadBtn._listenerAttached = true;
+
+  dom.pdfUploadBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    // Close submenu, then open file picker
+    const subMenu = document.getElementById('uploadSubMenu');
+    const wrap = document.getElementById('uploadBtnWrap');
+    if (subMenu) subMenu.style.display = 'none';
+    if (wrap) wrap.classList.remove('open');
+    dom.pdfInput.click();
+  });
   dom.pdfInput.addEventListener('change', handlePdfSelect);
+}
+
+// Wire upload menu toggle (open/close the +image/pdf submenu)
+function setupUploadMenu() {
+  const menuBtn = document.getElementById('uploadMenuBtn');
+  const subMenu = document.getElementById('uploadSubMenu');
+  const wrap    = document.getElementById('uploadBtnWrap');
+  if (!menuBtn || !subMenu || !wrap) return;
+  if (menuBtn._listenerAttached) return;
+  menuBtn._listenerAttached = true;
+
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const isOpen = wrap.classList.toggle('open');
+    subMenu.style.display = isOpen ? 'flex' : 'none';
+  });
+
+  // Close submenu when clicking anywhere outside
+  document.addEventListener('click', (e) => {
+    if (!wrap.contains(e.target)) {
+      wrap.classList.remove('open');
+      subMenu.style.display = 'none';
+    }
+  });
 }
 async function handlePdfSelect(e) {
   const file = e.target.files[0]; if (!file) return;
@@ -1991,7 +2095,7 @@ function initApp() {
   document.getElementById('appleSignInBtn')?.addEventListener('click', window.handleAppleSignIn);
 
   // File uploads, mode, voice, chips
-  setupImageUpload(); setupPdfUpload(); setupSscMode(); setupVoiceInput(); setupWelcomeChips();
+  setupImageUpload(); setupPdfUpload(); setupUploadMenu(); setupSscMode(); setupVoiceInput(); setupWelcomeChips();
   setupModelSelector();
   // Init all voice demo players after DOM is ready
   setTimeout(initVoiceDemos, 200);
