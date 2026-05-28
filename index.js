@@ -55,8 +55,7 @@ function setCors(req, res) {
   const allowedOrigins = [
     'https://rankgpt-f8a64.web.app',
     'https://rankgpt-f8a64.firebaseapp.com',
-    // GitHub Pages — update YOUR_GITHUB_USERNAME if different
-    'https://YOUR_GITHUB_USERNAME.github.io',
+    'https://shank122004-tech.github.io',
     'http://127.0.0.1:5500',
     'http://127.0.0.1:5501',
     'http://127.0.0.1:5502',
