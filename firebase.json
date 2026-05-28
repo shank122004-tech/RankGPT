@@ -1,0 +1,63 @@
+{
+  "functions": [
+    {
+      "source": "functions",
+      "codebase": "default",
+      "disallowLegacyRuntimeConfig": true,
+      "ignore": [
+        "node_modules",
+        ".git",
+        "firebase-debug.log",
+        "firebase-debug.*.log",
+        "*.local"
+      ]
+    }
+  ],
+  "hosting": {
+    "public": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**",
+      "functions/**",
+      "setup-env.sh"
+    ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          { "key": "Cache-Control", "value": "public, max-age=604800, stale-while-revalidate=86400" }
+        ]
+      },
+      {
+        "source": "/api/**",
+        "headers": [
+          { "key": "Access-Control-Allow-Origin",  "value": "*" },
+          { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+          { "key": "Access-Control-Allow-Headers", "value": "Content-Type, Authorization" },
+          { "key": "Access-Control-Max-Age",       "value": "3600" }
+        ]
+      },
+      {
+        "source": "**",
+        "headers": [
+          { "key": "X-Frame-Options",        "value": "SAMEORIGIN" },
+          { "key": "X-Content-Type-Options",  "value": "nosniff" },
+          { "key": "Referrer-Policy",         "value": "strict-origin-when-cross-origin" }
+        ]
+      }
+    ],
+    "rewrites": [
+      { "source": "/api/deepseek",               "function": "deepseek" },
+      { "source": "/api/gemini",                 "function": "geminiVision" },
+      { "source": "/api/create-cashfree-order",  "function": "createCashfreeOrder" },
+      { "source": "/api/verify-payment",         "function": "verifyPayment" },
+      { "source": "/api/health",                 "function": "health" }
+    ]
+  },
+  "emulators": {
+    "functions": { "port": 5001 },
+    "hosting":   { "port": 5000 },
+    "ui":        { "enabled": true }
+  }
+}
