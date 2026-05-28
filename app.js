@@ -3,12 +3,16 @@
 // ===== CONFIGURATION =====
 
 
-// ── API endpoints: relative paths → Firebase Hosting rewrites → Functions
-// Never call *.a.run.app directly — those URLs bypass your CORS config.
-const DEEPSEEK_API_URL    = "/api/deepseek";
-const GEMINI_API_URL      = "/api/gemini";
-const CASHFREE_ORDER_URL  = "/api/create-cashfree-order";
-const VERIFY_PAYMENT_URL  = "/api/verify-payment";
+// ── API base: auto-detect environment ───────────────────────
+// GitHub Pages / Live Server → hit deployed Firebase functions directly
+// Firebase Hosting (rankgpt-f8a64.web.app) → use relative rewrites
+const _IS_FIREBASE_HOSTING = location.hostname.includes('web.app') || location.hostname.includes('firebaseapp.com');
+const API_BASE = _IS_FIREBASE_HOSTING ? '' : 'https://rankgpt-f8a64.web.app';
+
+const DEEPSEEK_API_URL   = API_BASE + '/api/deepseek';
+const GEMINI_API_URL     = API_BASE + '/api/gemini';
+const CASHFREE_ORDER_URL = API_BASE + '/api/create-cashfree-order';
+const VERIFY_PAYMENT_URL = API_BASE + '/api/verify-payment';
 // DeepSeek Configuration
 const DEEPSEEK_MODEL = 'deepseek-chat';
 
