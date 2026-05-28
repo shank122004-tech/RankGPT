@@ -5,10 +5,14 @@
 
 
 // ── API endpoints ─────────────────────────────────────────────
-const DEEPSEEK_API_URL   = 'https://deepseek-56khnynjia-uc.a.run.app';
-// Use Firebase Hosting rewrite — same-origin, no CORS issues at all.
-// firebase.json maps  /api/gemini  →  geminiVision  function.
-const GEMINI_API_URL     = '/api/gemini';
+const DEEPSEEK_API_URL   = 'https://deepseek-419137308157.us-central1.run.app';
+
+// Gemini: on Firebase Hosting use same-origin rewrite (no CORS needed).
+// On localhost (Live Server) use direct Cloud Run URL instead.
+const _isLocalDev = ['127.0.0.1', 'localhost'].includes(location.hostname);
+const GEMINI_API_URL = _isLocalDev
+  ? 'https://geminivision-419137308157.us-central1.run.app'
+  : '/api/gemini';
 const CASHFREE_ORDER_URL =
 'https://createcashfreeorder-56khnynjia-uc.a.run.app';
 
