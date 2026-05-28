@@ -238,6 +238,7 @@ exports.deepseek = onRequest(
     memory: '256MiB',
     minInstances: 0,
     region: 'us-central1',
+    invoker: 'public',        // ← allow Cloud Run to receive requests; Firebase token verified inside
   },
   async (req, res) => {
     setCors(req, res);
@@ -331,6 +332,7 @@ exports.geminiVision = onRequest(
     memory: '512MiB',
     minInstances: 0,
     region: 'us-central1',
+    invoker: 'public',        // ← allow Cloud Run to receive requests; Firebase token still verified inside
   },
   async (req, res) => {
     setCors(req, res);
