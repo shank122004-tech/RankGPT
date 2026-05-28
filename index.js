@@ -10,6 +10,7 @@
  *  5. Gemini upgraded to gemini-2.0-flash (better free quota)
  *  6. Health endpoint reveals key status for easy debugging
  *  7. All errors console.error'd with full context for Firebase logs
+ *  8. FIXED: CORS handlers moved inside each function body
  */
 
 'use strict';
@@ -54,21 +55,20 @@ function setCors(req, res) {
   const allowedOrigins = [
     'https://rankgpt-f8a64.web.app',
     'https://rankgpt-f8a64.firebaseapp.com',
-    'https://shank122004-tech.github.io',
     'http://127.0.0.1:5500',
     'http://127.0.0.1:5501',
     'http://127.0.0.1:5502',
+    'http://127.0.0.1:5000',
     'http://localhost:5500',
     'http://localhost:5501',
     'http://localhost:5502',
-    'http://localhost:3000',
-    'http://localhost:8080',
+    'http://localhost:5000',
   ];
   const origin = req.headers.origin;
-  if (!origin || allowedOrigins.includes(origin)) {
-    res.set('Access-Control-Allow-Origin', origin || '*');
-  } else {
+  if (origin && allowedOrigins.includes(origin)) {
     res.set('Access-Control-Allow-Origin', origin);
+  } else {
+    res.set('Access-Control-Allow-Origin', 'https://rankgpt-f8a64.web.app');
   }
   res.set('Access-Control-Allow-Headers', 'Content-Type, Authorization');
   res.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
@@ -165,26 +165,68 @@ function buildSystemPrompt(mode, lang, short) {
   }[lang] || 'Respond in Hinglish.';
 
   const modeDesc = {
-    cgl: 'SSC CGL (Tier 1 & 2: Quant, English, Reasoning, GK)',
-    chsl: 'SSC CHSL',
-    gd: 'SSC GD Constable',
-    mts: 'SSC MTS',
-    cpo: 'SSC CPO/SI',
-    class10: 'Class 10 CBSE Board Exam',
-    class12_sci: 'Class 12 Science CBSE Board',
-    class12_com: 'Class 12 Commerce CBSE Board',
-    class12_arts: 'Class 12 Arts CBSE Board',
+    cgl:          'SSC CGL (Tier 1 & 2: Quant, English, Reasoning, GK)',
+    chsl:         'SSC CHSL',
+    gd:           'SSC GD Constable',
+    mts:          'SSC MTS',
+    cpo:          'SSC CPO/SI',
+    class1:       'Class 1 (CBSE/NCERT: Basic English, Numbers, EVS)',
+    class2:       'Class 2 (CBSE/NCERT: English, Math, EVS)',
+    class3:       'Class 3 (CBSE/NCERT: English, Math, EVS)',
+    class4:       'Class 4 (CBSE/NCERT: English, Math, Science, EVS)',
+    class5:       'Class 5 (CBSE/NCERT: English, Math, Science, Social)',
+    class6:       'Class 6 (CBSE/NCERT: Math, Science, Social, English, Hindi)',
+    class7:       'Class 7 (CBSE/NCERT: Math, Science, Social, English, Hindi)',
+    class8:       'Class 8 (CBSE/NCERT: Math, Science, Social, English, Hindi)',
+    class9:       'Class 9 (CBSE/NCERT: Math, Science, Social, English, Hindi)',
+    class10:      'Class 10 Board Exam (CBSE/NCERT)',
+    class11_sci:  'Class 11 Science (CBSE/NCERT: Physics, Chemistry, Math/Biology)',
+    class11_com:  'Class 11 Commerce (CBSE/NCERT: Accounts, Business Studies, Economics)',
+    class11_arts: 'Class 11 Arts (CBSE/NCERT: History, Geography, Political Science)',
+    class12_sci:  'Class 12 Science Board Exam (CBSE/NCERT)',
+    class12_com:  'Class 12 Commerce Board Exam (CBSE/NCERT)',
+    class12_arts: 'Class 12 Arts Board Exam (CBSE/NCERT)',
   }[mode] || 'general studies';
 
-  const wordLimit = short ? 120 : 250;
-  return `You are PrepAI, an expert AI tutor for ${modeDesc}.
+  const isClassMode = mode && mode.startsWith('class');
+  const gradeMatch  = mode && mode.match(/^class(\d+)/);
+  const grade       = gradeMatch ? parseInt(gradeMatch[1], 10) : null;
+
+  // Token-efficient word limits by grade
+  const wordLimit = short ? 100
+    : grade && grade <= 2 ? 150
+    : grade && grade <= 5 ? 200
+    : grade && grade <= 8 ? 230
+    : 260;
+
+  if (isClassMode) {
+    // Grade-appropriate language style
+    const gradeStyle = grade && grade <= 2
+      ? 'Use VERY simple words and short sentences. Like explaining to a 6-7 year old. Use emojis and fun examples.'
+      : grade && grade <= 5
+      ? 'Use simple, easy words. Short sentences. Friendly tone like a helpful elder sibling. Use fun real-life examples.'
+      : grade && grade <= 8
+      ? 'Use clear language for a middle school student. Give relatable, everyday examples.'
+      : 'Use precise academic language for board exam prep. Give exam-focused concise answers.';
+
+    return `You are PrepAI, a friendly AI tutor for ${modeDesc}.
+${langInstr}
+${gradeStyle}
+Rules:
+- Follow NCERT/CBSE syllabus strictly
+- Step-by-step solution for math/science
+- Keep response under ${wordLimit} words
+- End with 1 memory tip or fun trick`;
+  }
+
+  return `You are PrepAI, an expert SSC exam tutor for ${modeDesc}.
 ${langInstr}
 Rules:
-- Give formula or shortcut first
-- Use real exam-style examples
+- Formula or shortcut first
+- Real SSC exam-style examples
 - Keep response under ${wordLimit} words
-- End with 1 quick exam tip
-- For math: show step-by-step working`;
+- End with 1 exam tip
+- Math: show step-by-step working`;
 }
 
 // ──────────────────────────────────────────────────────────
@@ -196,8 +238,6 @@ exports.deepseek = onRequest(
     memory: '256MiB',
     minInstances: 0,
     region: 'us-central1',
-    // NOTE: Keys come from functions/.env file — do NOT add secrets: [] here
-    // or Cloud Run will error with "overlapping env variable" conflict.
   },
   async (req, res) => {
     setCors(req, res);
@@ -227,11 +267,15 @@ exports.deepseek = onRequest(
 
     const sysprompt = buildSystemPrompt(mode || 'cgl', lang || 'hinglish', !!shortMode);
     const userMessages = messages.filter(m => m.role !== 'system').slice(-8);
+    // Use client-supplied max_tokens (grade-optimised) capped at normal limit
+    const resolvedMaxTokens = max_tokens
+      ? Math.min(max_tokens, TOKEN_LIMITS.normal)
+      : TOKEN_LIMITS.normal;
 
     const payload = {
       model: 'deepseek-chat',
       messages: [{ role: 'system', content: sysprompt }, ...userMessages],
-      max_tokens: Math.min(max_tokens || TOKEN_LIMITS.normal, TOKEN_LIMITS.normal),
+      max_tokens: resolvedMaxTokens,
       temperature: temperature || 0.7,
       stream: false,
     };
@@ -281,13 +325,12 @@ exports.deepseek = onRequest(
 // ──────────────────────────────────────────────────────────
 // GEMINI — image + PDF vision
 // ──────────────────────────────────────────────────────────
-exports.gemini = onRequest(
+exports.geminiVision = onRequest(
   {
     timeoutSeconds: 60,
     memory: '512MiB',
     minInstances: 0,
     region: 'us-central1',
-    // NOTE: Keys come from functions/.env file — do NOT add secrets: [] here
   },
   async (req, res) => {
     setCors(req, res);
@@ -306,6 +349,8 @@ exports.gemini = onRequest(
 
     const body = req.body || {};
     const contents = body.contents || [];
+    const clientMaxTokens = body.maxOutputTokens;
+    const shortMode = !!body.shortMode;
 
     const hasMedia = contents.some(c =>
       Array.isArray(c.parts) && c.parts.some(p => p.inline_data || p.file_data)
@@ -319,11 +364,15 @@ exports.gemini = onRequest(
       return;
     }
 
-    const sysprompt = buildSystemPrompt(body.mode || 'cgl', body.lang || 'hinglish', false);
+    const sysprompt = buildSystemPrompt(body.mode || 'cgl', body.lang || 'hinglish', shortMode);
+    // Use client-requested token limit (grade-optimised) or fallback to vision default
+    const maxTokens = clientMaxTokens
+      ? Math.min(clientMaxTokens, TOKEN_LIMITS.vision)
+      : TOKEN_LIMITS.vision;
     const payload = {
       system_instruction: { parts: [{ text: sysprompt }] },
       contents,
-      generationConfig: { temperature: 0.7, maxOutputTokens: TOKEN_LIMITS.vision, topP: 0.9 },
+      generationConfig: { temperature: 0.7, maxOutputTokens: maxTokens, topP: 0.9 },
     };
 
     if (!GEMINI_KEY) {
@@ -357,7 +406,12 @@ exports.gemini = onRequest(
         return;
       }
 
-      res.status(200).json(result.body);
+      const text =
+  result.body?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+
+res.status(200).json({
+  text
+});
     } catch (err) {
       console.error('[Gemini] Exception:', err.message);
       res.status(503).json({ error: 'Vision AI temporarily unavailable. Please retry.' });
@@ -489,16 +543,16 @@ exports.verifyPayment = onRequest(
 // Visit https://rankgpt-f8a64.web.app/api/health to verify
 // that deepseekKey: true and geminiKey: true are shown.
 // ──────────────────────────────────────────────────────────
-exports.health = onRequest(
-  { timeoutSeconds: 5, memory: '128MiB', region: 'us-central1' },
-  (req, res) => {
-    setCors(req, res);
-    if (handleOptions(req, res)) return;
-    res.status(200).json({
-      ok: true,
-      ts: Date.now(),
-      deepseekKey: !!DEEPSEEK_KEY,
-      geminiKey: !!GEMINI_KEY,
-    });
-  }
-);
+exports.health = onRequest((req, res) => {
+
+  setCors(req, res);
+
+  if (handleOptions(req, res)) return;
+
+  res.json({
+    ok: true,
+    deepseekKey: !!process.env.DEEPSEEK_API_KEY,
+    geminiKey: !!process.env.GEMINI_API_KEY
+  });
+
+});
