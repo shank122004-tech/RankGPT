@@ -30,8 +30,10 @@ initializeApp();
 //   firebase functions:secrets:set GEMINI_API_KEY
 // Fallback values below are used if env var is not set.
 // ──────────────────────────────────────────────────────────
-const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || 'sk-0640a6cbd77748cf8f836e26b07e2fc2';
-const GEMINI_KEY   = process.env.GEMINI_API_KEY   || 'AIzaSyC97b4V_hgm3XjwB3tLCHZMkLe9bdUIZ3U';
+// Keys come from functions/.env (already working — Firebase CLI loads it automatically)
+// DO NOT also declare these via secrets:[] in onRequest config — causes deploy conflict.
+const DEEPSEEK_KEY = process.env.DEEPSEEK_API_KEY || '';
+const GEMINI_KEY   = process.env.GEMINI_API_KEY   || '';
 const CASHFREE_ENV = process.env.CASHFREE_ENV || 'production';
 
 const DEEPSEEK_BASE = 'api.deepseek.com';
@@ -194,7 +196,8 @@ exports.deepseek = onRequest(
     memory: '256MiB',
     minInstances: 0,
     region: 'us-central1',
-    secrets: ['DEEPSEEK_API_KEY'],
+    // NOTE: Keys come from functions/.env file — do NOT add secrets: [] here
+    // or Cloud Run will error with "overlapping env variable" conflict.
   },
   async (req, res) => {
     setCors(req, res);
@@ -284,7 +287,7 @@ exports.gemini = onRequest(
     memory: '512MiB',
     minInstances: 0,
     region: 'us-central1',
-    secrets: ['GEMINI_API_KEY'],
+    // NOTE: Keys come from functions/.env file — do NOT add secrets: [] here
   },
   async (req, res) => {
     setCors(req, res);
