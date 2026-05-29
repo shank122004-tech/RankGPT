@@ -2488,7 +2488,13 @@ function openPremiumModal() {
 window.showPremiumModal = openPremiumModal;
 
 // ===== SETTINGS =====
-function openSettingsModal() { dom.settingsModal.classList.add('active'); }
+function openSettingsModal() {
+  dom.settingsModal.classList.add('active');
+  // Sync persona dropdown to current state
+  const sel = document.getElementById('personaSettingsSelect');
+  if (sel) sel.value = state.aiPersona || '';
+  _updatePersonaSettingsDesc(state.aiPersona || '');
+}
 function closeSettingsModal() { dom.settingsModal.classList.remove('active'); }
 
 // ===== LEGAL MODALS =====
@@ -2695,18 +2701,56 @@ function closePersonaSelector() {
   if (modal) modal.classList.remove('active');
 }
 window.selectPersona = function(persona) {
-  // Companion personas require ₹49 unlock
-  if ((persona === 'boyfriend' || persona === 'girlfriend') && !isAddonActive(ADDON_PLAN_COMPANION)) {
-    openCompanionModal();
+  // All personas are now free including boyfriend & girlfriend
+  if (!persona) {
+    state.aiPersona = null;
+    saveState();
+    closePersonaSelector();
+    // sync settings dropdown
+    const sel = document.getElementById('personaSettingsSelect');
+    if (sel) sel.value = '';
+    _updatePersonaSettingsDesc('');
+    showToast('🤖 Default AI mode activated!');
     return;
   }
   state.aiPersona = persona;
   saveState();
   closePersonaSelector();
-  const names = { bhaiya:'Bhaiya', didi:'Didi', teacher:'Teacher', friend:'Best Friend', professor:'Professor', mentor:'Mentor', motivator:'Motivator', coach:'Coach', boyfriend:'Boyfriend 💕', girlfriend:'Girlfriend 💕' };
+  // Sync the settings dropdown to match
+  const sel = document.getElementById('personaSettingsSelect');
+  if (sel) sel.value = persona;
+  _updatePersonaSettingsDesc(persona);
+  const names = {
+    bhaiya:'Bhaiya 👦', didi:'Didi 👩', teacher:'Teacher 📚',
+    friend:'Best Friend 🤝', professor:'Professor 🎩', mentor:'Mentor 🧘',
+    motivator:'Motivator ⚡', coach:'Coach 🏋️',
+    boyfriend:'Boyfriend 💕', girlfriend:'Girlfriend 💕'
+  };
   showToast(`✅ ${names[persona] || persona} mode activated! 🎉`);
   _doConfetti();
 };
+
+// Update the small description line below the settings select
+function _updatePersonaSettingsDesc(persona) {
+  const el = document.getElementById('personaSettingsDesc');
+  if (!el) return;
+  const descs = {
+    '': '',
+    bhaiya: '👦 Elder brother energy — warm Hinglish banter',
+    didi: '👩 Elder sister vibes — loving and patient',
+    friend: '🤝 Chill study buddy — casual and fun',
+    teacher: '📚 Patient, clear explanations with examples',
+    professor: '🎩 Deep academic explanations with proper theory',
+    mentor: '🧘 Life guide — mindset, habits & vision',
+    motivator: '⚡ High energy hype — every message is a boost!',
+    coach: '🏋️ Strict but fair — direct and results-focused',
+    boyfriend: '💕 Caring desi boyfriend — romantic Hinglish vibes',
+    girlfriend: '💕 Sweet desi girlfriend — expressive & loving',
+  };
+  el.textContent = descs[persona] || '';
+}
+window._updatePersonaSettingsDesc = _updatePersonaSettingsDesc;
+
 window.showPersonaSelector = showPersonaSelector;
 window.closePersonaSelector = closePersonaSelector;
 
@@ -2857,6 +2901,13 @@ function initApp() {
   document.getElementById('upgradeDrawerBtn')?.addEventListener('click', () => { closeDrawer(); openPremiumModal(); });
   if (dom.darkModeToggle) dom.darkModeToggle.addEventListener('change', (e) => applyTheme(e.target.checked ? 'dark' : 'light'));
   if (dom.aiLangSelect) dom.aiLangSelect.addEventListener('change', (e) => { state.aiLang = e.target.value; saveState(); showToast('Language saved'); });
+
+  // Sync persona settings dropdown on init
+  const personaSettingsSel = document.getElementById('personaSettingsSelect');
+  if (personaSettingsSel) {
+    personaSettingsSel.value = state.aiPersona || '';
+    if (window._updatePersonaSettingsDesc) _updatePersonaSettingsDesc(state.aiPersona || '');
+  }
 
   // Cost toggles
   [['cachingToggle', 'cachingEnabled', '✅ Caching ON', '❌ Caching OFF'], ['shortResponseToggle', 'shortResponseMode', '✅ Short mode ON', '❌ Short mode OFF'], ['limitHistoryToggle', 'limitHistoryMode', '✅ History limit ON', '❌ History limit OFF'], ['noSystemPromptToggle', 'noSystemPrompt', '✅ No system prompt', '❌ System prompt ON']].forEach(([id, key, on, off]) => {
