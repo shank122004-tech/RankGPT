@@ -775,6 +775,30 @@
       </div>
 
       <div class="settings-divider"></div>
+      <div class="settings-section-title">💬 AI Persona</div>
+      <div class="settings-item" style="flex-wrap:wrap;gap:8px;">
+        <div class="settings-item-icon purple">🎭</div>
+        <div class="settings-item-info" style="flex:1;">
+          <div class="settings-item-label">Talk Style</div>
+          <div class="settings-item-desc">Choose how AI talks to you</div>
+        </div>
+        <select id="personaSettingsSelect" class="settings-select" style="min-width:130px;" onchange="window.selectPersona(this.value)">
+          <option value="">🤖 Default AI</option>
+          <option value="bhaiya">👦 Bhaiya (Elder Bro)</option>
+          <option value="didi">👩 Didi (Elder Sis)</option>
+          <option value="friend">🤝 Best Friend</option>
+          <option value="teacher">📚 Teacher</option>
+          <option value="professor">🎩 Professor</option>
+          <option value="mentor">🧘 Mentor</option>
+          <option value="motivator">⚡ Motivator</option>
+          <option value="coach">🏋️ Coach</option>
+          <option value="boyfriend">💕 Boyfriend</option>
+          <option value="girlfriend">💕 Girlfriend</option>
+        </select>
+      </div>
+      <div id="personaSettingsDesc" style="margin:4px 8px 0 44px;font-size:11px;color:rgba(200,195,255,0.5);min-height:16px;"></div>
+
+      <div class="settings-divider"></div>
       <div class="settings-section-title">🤖 AI Model Routing</div>
       <div class="ai-model-info">
         <div class="model-row">
@@ -1329,21 +1353,19 @@
 
       <!-- Premium Companion Personas -->
       <button class="ps-card ps-card-companion" onclick="selectPersona('boyfriend')">
-        <div class="ps-card-badge" style="background:linear-gradient(135deg,#FF6B9D,#ff9a8b);color:#fff;">💕 PREMIUM</div>
+        <div class="ps-card-badge" style="background:linear-gradient(135deg,#FF6B9D,#ff9a8b);color:#fff;">💕 FREE</div>
         <div class="ps-card-emoji">👦</div>
         <div class="ps-card-name" style="color:#FF6B9D;">Boyfriend</div>
         <div class="ps-card-desc">Loving, caring, flirty desi boyfriend who supports you through studies & life</div>
         <div class="ps-card-example">"jaan aaj bahut acchi lag rahi ho 🥺 chal saath padhte hain 📚❤️"</div>
-        <div class="ps-companion-lock">🔒 ₹49 Unlock</div>
       </button>
 
       <button class="ps-card ps-card-companion" onclick="selectPersona('girlfriend')">
-        <div class="ps-card-badge" style="background:linear-gradient(135deg,#a855f7,#FF6B9D);color:#fff;">💕 PREMIUM</div>
+        <div class="ps-card-badge" style="background:linear-gradient(135deg,#a855f7,#FF6B9D);color:#fff;">💕 FREE</div>
         <div class="ps-card-emoji">👩</div>
         <div class="ps-card-name" style="color:#FF6B9D;">Girlfriend</div>
         <div class="ps-card-desc">Sweet, expressive, slightly dramatic desi girlfriend — always there for you</div>
         <div class="ps-card-example">"kaha the itni der? miss kar rahi thi toh 🥺 baat karo na mujhse 💕"</div>
-        <div class="ps-companion-lock">🔒 ₹49 Unlock</div>
       </button>
 
     </div>
