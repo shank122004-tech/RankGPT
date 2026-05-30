@@ -103,22 +103,35 @@ function needsRealTimeSearch(messages) {
 exports.geminiVision = onRequest((req, res) => {
   cors(req, res, async () => {
     try {
-      let messages = req.body.contents
-        ? req.body.contents.map(c => ({
-            role: c.role === "model" ? "assistant" : (c.role || "user"),
-            content: Array.isArray(c.parts) ? c.parts.map(p => p.text || "").join("") : ""
-          }))
-        : [{ role: "user", content: req.body.message || "" }];
+      const GEMINI_KEY   = process.env.GEMINI_API_KEY || "AIzaSyCmzArFqO2Y1-Mm4THkiN7y_1xjogWNqyY";
+      const GEMINI_MODEL = "gemini-1.5-flash";
+      const geminiUrl    = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
 
-      const response = await axios.post(
-        "https://api.deepseek.com/chat/completions",
-        { model: "deepseek-chat", messages, max_tokens: 2048, temperature: 0.7 },
-        { headers: { Authorization: `Bearer ${DEEPSEEK_KEY()}` }, timeout: 30000 }
-      );
-      const text = response.data?.choices?.[0]?.message?.content;
-      res.json({ text: text || "" });
+      // Accept the body as-is from the client (contents array with inline_data parts)
+      const requestBody = {
+        contents: req.body.contents || [{
+          parts: [{ text: req.body.message || "Describe this image." }]
+        }],
+        generationConfig: req.body.generationConfig || {
+          maxOutputTokens: 2048,
+          temperature: 0.4
+        }
+      };
+
+      const response = await axios.post(geminiUrl, requestBody, {
+        timeout: 30000,
+        headers: { "Content-Type": "application/json" }
+      });
+
+      const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        res.json({ text });
+      } else {
+        // Return raw response so client can debug if needed
+        res.json({ text: "", raw: response.data });
+      }
     } catch (err) {
-      functions.logger.error("[geminiVision->deepseek]", err.response?.data || err.message);
+      functions.logger.error("[geminiVision]", err.response?.data || err.message);
       res.status(500).json({ error: err.response?.data?.error?.message || err.message });
     }
   });
