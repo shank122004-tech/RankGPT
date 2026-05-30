@@ -8,7 +8,38 @@
 const DEEPSEEK_API_URL = 'https://deepseek-56khnynjia-uc.a.run.app';
 // Gemini Flash — image/vision only (Firebase function proxy)
 const GEMINI_PROXY_URL  = 'https://geminivision-56khnynjia-uc.a.run.app';
-const DEEPSEEK_MODEL    = 'deepseek-chat';
+const DEEPSEEK_MODEL = 'deepseek-chat'; // default fallback
+
+// ── DeepSeek API model strings (May 2026) ────────────────────
+// deepseek-chat      = V4 Flash (non-thinking) — $0.14/$0.28 per 1M tokens
+// deepseek-reasoner  = V4 Flash (thinking/CoT) — $0.14/$0.28 per 1M tokens
+// deepseek-v4-pro    = V4 Pro   (flagship)     — $1.74/$3.48 per 1M tokens  ← PAID ONLY
+//
+// NOTE: deepseek-chat and deepseek-reasoner are official aliases for V4 Flash.
+// deepseek-v4-pro is 12× more expensive — only available behind paid addon gate.
+
+const DEEPSEEK_MODEL_MAP = {
+  smart:        'deepseek-chat',      // PrepAI Smart       → V4 Flash (fast)        FREE
+  flash:        'deepseek-chat',      // PrepAI Flash       → V4 Flash (fast)        FREE
+  pro:          'deepseek-reasoner',  // PrepAI Pro (R1)    → V4 Flash thinking      FREE (SSC/Class plan)
+  vision:       'deepseek-chat',      // Vision             → V4 Flash               FREE
+  'vision-pro': 'deepseek-reasoner',  // Vision Pro         → V4 Flash thinking      FREE (addon)
+  'voice-text': 'deepseek-chat',      // Voice→Text         → V4 Flash               FREE
+  voice:        'deepseek-chat',      // Voice Mode         → V4 Flash               FREE
+  teacher:      'deepseek-chat',      // Teacher Mode       → V4 Flash               FREE (premium)
+  'v4-pro':     'deepseek-v4-pro',    // PrepAI V4 Pro      → V4 Pro flagship        PAID ₹149/mo
+};
+
+// Plan ID for V4 Pro addon
+const ADDON_PLAN_V4PRO = 'v4pro_addon';
+const ADDON_PRICE_V4PRO = 149; // ₹149/month — covers API cost + profit margin
+
+// Global tracker for selected UI model (set by model-selector IIFE below)
+window._selectedDeepSeekModel = 'deepseek-chat';
+
+function getDeepSeekModel() {
+  return window._selectedDeepSeekModel || DEEPSEEK_MODEL;
+}
 // ── TEACHER AD REWARD CONFIG ─────────────────────────────────
 const TEACHER_AD_REWARD_KEY = 'crackwith_teacher_ad_reward';
 const TEACHER_AD_REWARD_DURATION_MS = 30 * 60 * 1000; // 30 minutes
@@ -1155,7 +1186,7 @@ async function callDeepSeek(userMessage, chatHistory = []) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: DEEPSEEK_MODEL,
+      model: getDeepSeekModel(),
       messages,
       max_tokens: getOptimalMaxTokens(false),
       temperature: 0.7,
@@ -2349,6 +2380,104 @@ function pollAddonPayment(orderId, planId, attempt = 0) {
   }, 5000);
 }
 
+// ── V4 Pro Modal — ₹149/month ────────────────────────────────────────────────
+function openV4ProModal() {
+  document.getElementById('v4ProModal')?.remove();
+  const modal = document.createElement('div');
+  modal.id = 'v4ProModal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.88);padding:20px;backdrop-filter:blur(8px);';
+  modal.innerHTML = `
+    <div style="background:linear-gradient(135deg,#0a0520,#150a30,#0a0520);border:1px solid rgba(255,107,157,0.4);border-radius:24px;padding:30px 24px;max-width:380px;width:100%;text-align:center;box-shadow:0 0 80px rgba(255,107,157,0.15),0 0 40px rgba(108,99,255,0.1);">
+      <div style="font-size:42px;margin-bottom:8px;">🚀</div>
+      <div style="display:inline-block;background:linear-gradient(135deg,#FF6B9D,#f59e0b);color:#fff;font-size:10px;font-weight:800;letter-spacing:0.12em;text-transform:uppercase;padding:3px 12px;border-radius:20px;margin-bottom:12px;">DeepSeek V4 Pro · Flagship</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#fff;margin-bottom:6px;">PrepAI V4 Pro</div>
+      <div style="font-size:13px;color:rgba(200,195,255,0.65);margin-bottom:20px;line-height:1.6;">The most powerful DeepSeek model — 1M context window, best-in-class reasoning for tough SSC/Board questions</div>
+
+      <div style="background:rgba(255,255,255,0.04);border-radius:14px;padding:14px 16px;margin-bottom:20px;text-align:left;">
+        <div style="font-size:12px;color:rgba(255,255,255,0.75);display:flex;flex-direction:column;gap:7px;">
+          <span>🚀 DeepSeek V4 Pro — flagship AI model</span>
+          <span>🧠 1M token context window (10× more)</span>
+          <span>📐 Best at complex Math, Reasoning & Science</span>
+          <span>🔬 384K max output — full detailed solutions</span>
+          <span>⚡ Thinking + non-thinking mode</span>
+          <span>♾️ Unlimited V4 Pro questions per month</span>
+        </div>
+      </div>
+
+      <div style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.2);border-radius:12px;padding:12px;margin-bottom:18px;">
+        <div style="font-size:11px;color:rgba(200,195,255,0.5);margin-bottom:4px;">Why ₹149/month?</div>
+        <div style="font-size:12px;color:rgba(200,195,255,0.7);line-height:1.5;">V4 Pro costs 12× more than V4 Flash on the API. This plan covers those costs so you get flagship AI at the lowest sustainable price.</div>
+      </div>
+
+      <div style="font-size:32px;font-weight:800;color:#FF6B9D;margin-bottom:2px;">
+        ₹149 <span style="font-size:13px;font-weight:400;color:rgba(200,195,255,0.45);">/ month</span>
+      </div>
+      <div style="font-size:11px;color:rgba(200,195,255,0.35);margin-bottom:20px;">Cancel anytime · Renews monthly</div>
+
+      <button id="v4ProPayBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,#FF6B9D,#f59e0b,#FF6B9D);background-size:200%;color:#fff;border:none;border-radius:14px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px;box-shadow:0 4px 24px rgba(255,107,157,0.35);animation:gradShift 3s ease infinite;">
+        🚀 Unlock V4 Pro — ₹149/mo
+      </button>
+      <button onclick="document.getElementById('v4ProModal').remove()" style="width:100%;padding:10px;background:transparent;color:rgba(200,195,255,0.45);border:1px solid rgba(108,99,255,0.15);border-radius:12px;font-size:13px;cursor:pointer;">
+        Maybe Later
+      </button>
+      <div style="margin-top:14px;font-size:11px;color:rgba(200,195,255,0.25);">🔒 Secured by Cashfree Payments</div>
+    </div>`;
+  document.body.appendChild(modal);
+
+  document.getElementById('v4ProPayBtn')?.addEventListener('click', async () => {
+    const btn = document.getElementById('v4ProPayBtn');
+    if (!window._firebaseAuth?.currentUser) { showToast('Please login first!'); return; }
+    btn.disabled = true; btn.textContent = '⏳ Creating order…';
+    try {
+      const uid = window._firebaseAuth.currentUser.uid;
+      const orderId = 'addon_v4pro_' + uid + '_' + Date.now();
+      const res = await fetch(CASHFREE_ORDER_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_id: orderId, amount: ADDON_PRICE_V4PRO, currency: 'INR',
+          customer_id: uid,
+          customer_email: window._firebaseAuth.currentUser.email || 'student@crackai.in',
+          customer_phone: '9999999999',
+          order_note: ADDON_PLAN_V4PRO,
+          app_id: CASHFREE_APP_ID
+        })
+      });
+      const data = await res.json();
+      if (!data.payment_session_id) throw new Error('No session');
+      localStorage.setItem('crackai_pending_addon', JSON.stringify({ orderId, planId: ADDON_PLAN_V4PRO, ts: Date.now() }));
+      const cashfree = Cashfree({ mode: 'production' });
+      cashfree.checkout({ paymentSessionId: data.payment_session_id, redirectTarget: '_modal' });
+      pollV4ProPayment(orderId);
+    } catch(e) {
+      btn.disabled = false; btn.textContent = '🚀 Unlock V4 Pro — ₹149/mo';
+      showToast('❌ Payment error: ' + e.message);
+    }
+  });
+
+  modal.addEventListener('click', (e) => { if (e.target === modal) modal.remove(); });
+}
+
+function pollV4ProPayment(orderId, attempt = 0) {
+  if (attempt >= 24) { showToast('⏰ Payment not confirmed. Contact support if paid.'); return; }
+  setTimeout(async () => {
+    try {
+      const result = await verifyCashfreePayment(orderId);
+      if (result?.status === 'PAID') {
+        setAddonActive(ADDON_PLAN_V4PRO);
+        document.getElementById('v4ProModal')?.remove();
+        localStorage.removeItem('crackai_pending_addon');
+        window._selectedDeepSeekModel = 'deepseek-v4-pro';
+        showToast('🚀 V4 Pro unlocked! You\'re on the flagship model now!');
+        _doConfetti();
+        return;
+      }
+      if (result?.status === 'FAILED') { showToast('❌ Payment failed. Try again.'); return; }
+    } catch(e) {}
+    pollV4ProPayment(orderId, attempt + 1);
+  }, 5000);
+}
+
 function checkPendingPayment() {
   try {
     const pending = JSON.parse(localStorage.getItem('sscai_pending_order') || 'null');
@@ -2675,12 +2804,13 @@ function setupModelSelector() {
   var models = {
     smart:      { icon:'🧠', label:'PrepAI Smart',      chip:'Smart'   },
     flash:      { icon:'⚡', label:'PrepAI Flash',      chip:'Flash'   },
-    pro:        { icon:'✨', label:'PrepAI Pro',         chip:'Pro'     },
+    pro:        { icon:'✨', label:'PrepAI Pro (R1)',    chip:'Pro'     },
     vision:     { icon:'🔍', label:'PrepAI Vision',     chip:'Vision'  },
     'vision-pro':{ icon:'🔬', label:'PrepAI Vision Pro', chip:'Vision Pro' },
     'voice-text':{ icon:'🎙️', label:'Voice → Text',    chip:'Voice'   },
     voice:      { icon:'🔊', label:'Voice Mode',        chip:'Voice'   },
     teacher:    { icon:'👩‍🏫', label:'Teacher Mode',    chip:'Teacher' },
+    'v4-pro':   { icon:'🚀', label:'V4 Pro (Flagship)', chip:'V4 Pro'  },
   };
 
   var selectedModel = 'smart';
@@ -2721,8 +2851,16 @@ function setupModelSelector() {
         openAddonModal(model === 'pro' ? 'prepaipro' : 'visionpro');
         return;
       }
+      // V4 Pro — DeepSeek flagship model, requires ₹149/month paid addon
+      if (model === 'v4-pro' && !state.isPremium && !isAddonActive(ADDON_PLAN_V4PRO)) {
+        dropdown.classList.remove('open');
+        openV4ProModal();
+        return;
+      }
 
       selectedModel = model;
+      // Update global DeepSeek model string
+      window._selectedDeepSeekModel = DEEPSEEK_MODEL_MAP[model] || DEEPSEEK_MODEL;
       // Update UI
       dropdown.querySelectorAll('.model-option').forEach(function(o) {
         o.classList.remove('active');
