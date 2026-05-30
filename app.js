@@ -1118,12 +1118,12 @@ TOPICS: Quantitative Aptitude, English Language, General Reasoning, General Know
 // Returns optimal max_tokens for current mode (saves API cost)
 function getOptimalMaxTokens(hasVision) {
   const grade = _getGradeLevel(state.sscMode);
-  if (state.shortResponseMode) return 250;
-  if (hasVision) return grade && grade <= 5 ? 400 : 600; // vision needs more tokens
-  if (grade && grade <= 2) return 200;   // Class 1-2: very short answers
-  if (grade && grade <= 5) return 280;   // Class 3-5: short answers
-  if (grade && grade <= 8) return 380;   // Class 6-8: medium answers
-  return 500;                            // Class 9-12 / SSC: full answers
+  if (state.shortResponseMode) return 200;
+  if (hasVision) return grade && grade <= 5 ? 350 : 500;
+  if (grade && grade <= 2) return 150;
+  if (grade && grade <= 5) return 220;
+  if (grade && grade <= 8) return 320;
+  return 500; // Class 9-12 / SSC
 }
 
 // ===== AI CALLS =====
@@ -1163,23 +1163,13 @@ async function callDeepSeek(userMessage, chatHistory = []) {
 
   const firebaseUser = window._firebaseAuth?.currentUser;
   if (!firebaseUser) throw new Error('Please login first');
-  const token = await firebaseUser.getIdToken();
 
-  const historyLimit = state.limitHistoryMode ? 2 : 6;
-  const messages = [];
   const systemPrompt = getSystemPrompt();
-  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
 
-  // Sanitize history — convert any array content to plain string
-  chatHistory.slice(-historyLimit).forEach(m => {
-    let content = m.content;
-    if (Array.isArray(content)) {
-      content = content.filter(p => p.type === 'text').map(p => p.text || '').join(' ');
-    } else if (typeof content !== 'string') {
-      content = String(content || '');
-    }
-    if (content.trim()) messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content });
-  });
+  // NO history sent — only system prompt + current user message
+  // This saves 60-80% of input tokens on every request
+  const messages = [];
+  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
   messages.push({ role: 'user', content: userMessage });
 
   const response = await fetch(DEEPSEEK_API_URL, {
@@ -1305,18 +1295,10 @@ async function extractPdfTextClientSide(pdfBase64) {
  * 2. PDFs:   pdf.js extracts text → DeepSeek answers
  */
 async function callDeepSeekVision(userMessage, chatHistory = [], imageBase64Array = [], pdfBase64 = null) {
-  const historyLimit = state.limitHistoryMode ? 2 : 4;
   const systemPrompt = getSystemPrompt();
 
-  // Sanitised history (no prior image arrays)
-  const baseHistory = chatHistory.slice(-historyLimit).map(m => ({
-    role: m.role === 'user' ? 'user' : 'assistant',
-    content: typeof m.content === 'string'
-      ? m.content
-      : (Array.isArray(m.content)
-          ? m.content.filter(p => p.type === 'text').map(p => p.text).join(' ')
-          : String(m.content || ''))
-  }));
+  // NO history — only current message sent to save tokens
+  const baseHistory = [];
 
   // ── IMAGE PATH ─────────────────────────────────────────────
   if (imageBase64Array.length > 0) {
@@ -1757,7 +1739,7 @@ async function sendMessage() {
   addTypingIndicator();
   if (dom.aiStatus) dom.aiStatus.innerHTML = '● Processing...';
   try {
-    const response = await callAI(msgText, currentMessages.slice(-10), imageData, pdfData);
+    const response = await callAI(msgText, [], imageData, pdfData);
     removeTypingIndicator();
     addMessage('ai', response);
     currentMessages.push({ role: 'ai', content: response });
