@@ -331,3 +331,22 @@
   -webkit-backface-visibility: hidden;
   backface-visibility: hidden;
 }
+/*
+ * intro.css — CrackAI Intro v7.0
+ * ─────────────────────────────────
+ * Most styles are injected by intro.js for precise control.
+ * This file provides only the hard safety rules.
+ */
+
+/* Skip intro entirely for reduced-motion users */
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay { display: none !important; }
+}
+
+/* Ensure overlay is always on top and non-scrollable */
+#sscIntroOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  overflow: hidden;
+}
