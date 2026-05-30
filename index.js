@@ -231,7 +231,17 @@ exports.deepseek = onRequest((req, res) => {
   cors(req, res, async () => {
     try {
       let messages = req.body.messages || [];
-      const model   = req.body.model || "deepseek-chat";
+      // ── Allowed DeepSeek models (no random strings) ──────────────────────────
+      const ALLOWED_MODELS = new Set([
+        "deepseek-chat",      // V4 Flash (non-thinking) — default / smart / flash
+        "deepseek-reasoner",  // V4 Flash (thinking/CoT) — pro / vision-pro
+        "deepseek-v4-pro",    // V4 Pro flagship — PAID addon only (₹149/mo)
+      ]);
+      const requestedModel = req.body.model || "deepseek-chat";
+      const model = ALLOWED_MODELS.has(requestedModel) ? requestedModel : "deepseek-chat";
+      if (!ALLOWED_MODELS.has(requestedModel)) {
+        functions.logger.warn(`[deepseek] Blocked disallowed model "${requestedModel}", falling back to deepseek-chat`);
+      }
       const isPdf   = req.body.isPdf || false;
       const isVision = req.body.isVision || false;
 
