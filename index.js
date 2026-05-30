@@ -1,17 +1,119 @@
 /**
  * index.js — Cloud Functions entry point
+ * 
+ * ROUTING LOGIC:
+ *   Real-time questions  → Gemini 2.0 Flash (Google Search grounding built-in)
+ *   All other questions  → DeepSeek (cheap, fast, no history sent)
+ *   Images/Vision        → geminiVision endpoint (unchanged)
  */
-const cors = require("cors")({ origin: true });
+const cors    = require("cors")({ origin: true });
 const { onRequest } = require("firebase-functions/v2/https");
-const functions  = require("firebase-functions");
-const admin      = require("firebase-admin");
-const axios      = require("axios");
+const functions     = require("firebase-functions");
+const admin         = require("firebase-admin");
+const axios         = require("axios");
 
 if (!admin.apps.length) admin.initializeApp();
 const db = admin.firestore();
 
-// ─── Scheduled: Clean up expired pending bookings ────────────────────────────
-const cleanupExpiredPendingBookings = functions
+// ─── API Keys ─────────────────────────────────────────────────────────────────
+const DEEPSEEK_KEY = () => process.env.DEEPSEEK_API_KEY || "sk-f617d7a27b2b42579f7093e4857d015c";
+const GEMINI_KEY   = () => process.env.GEMINI_API_KEY   || "AIzaSyCmzArFqO2Y1-Mm4THkiN7y_1xjogWNqyY";
+
+// ─── Allowed DeepSeek models ──────────────────────────────────────────────────
+const ALLOWED_MODELS = new Set([
+  "deepseek-chat",      // V4 Flash — default, fast, cheap
+  "deepseek-reasoner",  // V4 Flash thinking/CoT — pro mode
+  "deepseek-v4-pro",    // V4 Pro flagship — paid addon ₹149/mo
+]);
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function getTextContent(content) {
+  if (!content) return "";
+  if (typeof content === "string") return content;
+  if (Array.isArray(content)) return content.filter(p => p.type === "text").map(p => p.text || "").join(" ");
+  return String(content);
+}
+
+// ─── Real-time detection patterns ────────────────────────────────────────────
+// If query matches → route to Gemini (has live Google Search grounding)
+// If not → route to DeepSeek (cheaper, better for concepts/math/SSC)
+const REALTIME_PATTERNS = [
+  /who is (the )?(current |new |present )?/i,
+  /who (is|are|was|were) .*(president|pm|prime minister|ceo|minister|chief|head|leader|governor|mayor|chairman)/i,
+  /president of/i,
+  /prime minister of/i,
+  /(current|latest|recent|new|today|now|2025|2026).*(president|pm|minister|ceo|winner|champion|rank|result|score|rate|price)/i,
+  /(price|rate|value) of (gold|silver|petrol|diesel|dollar|usd|bitcoin|share|stock)/i,
+  /latest (news|update|result|match|score|notification)/i,
+  /who won/i,
+  /election result/i,
+  /ipl|world cup|olympic|cricket score|football score|match result/i,
+  /today.*(weather|news|rate|price)/i,
+  /current (affairs|news|events|rate|price|government)/i,
+  /admit card|answer key|result date|exam date|cutoff.*2025|cutoff.*2026/i,
+  /vacancy.*2025|vacancy.*2026|notification.*2025|notification.*2026/i,
+];
+
+const REALTIME_KEYWORDS = [
+  "who is","who are","current president","current pm","current ceo",
+  "latest news","recent news","today news","breaking news",
+  "live score","match score","ipl score","cricket score",
+  "gold price","silver price","petrol price","diesel price",
+  "stock price","share price","bitcoin price","dollar rate",
+  "election result","election 2026","election 2025",
+  "current affairs 2026","current affairs 2025",
+  "admit card 2026","answer key 2026","result date 2026",
+  "ssc result","upsc result","ibps result","rrb result",
+];
+
+function isRealTimeQuery(text) {
+  const lower = text.toLowerCase();
+  if (REALTIME_PATTERNS.some(p => p.test(lower))) return true;
+  if (REALTIME_KEYWORDS.some(k => lower.includes(k))) return true;
+  return false;
+}
+
+// ─── Gemini 2.0 Flash — Real-time answer with Google Search grounding ─────────
+async function callGeminiRealTime(userQuestion, systemContext) {
+  const GEMINI_MODEL = "gemini-2.0-flash";
+  const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY()}`;
+
+  const today = new Date().toLocaleDateString("en-IN", {
+    weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata"
+  });
+
+  // Build a focused prompt — no history, just the question + context
+  const prompt = `Today is ${today}.
+
+${systemContext ? `Context: ${systemContext.substring(0, 300)}\n\n` : ""}User question: ${userQuestion}
+
+Answer using the most current information available. Be accurate, concise and helpful. If this is a current affairs / GK question relevant to Indian exams (SSC/UPSC/IBPS), also mention why it's important for exams.`;
+
+  const requestBody = {
+    contents: [{ parts: [{ text: prompt }] }],
+    // Enable Google Search grounding — gives Gemini real-time web access
+    tools: [{ google_search: {} }],
+    generationConfig: {
+      maxOutputTokens: 800,
+      temperature: 0.3,
+    },
+  };
+
+  const response = await axios.post(geminiUrl, requestBody, {
+    timeout: 20000,
+    headers: { "Content-Type": "application/json" },
+  });
+
+  const text = response.data?.candidates?.[0]?.content?.parts
+    ?.filter(p => p.text)
+    ?.map(p => p.text)
+    ?.join("") || "";
+
+  return text;
+}
+
+// ─── Scheduled: Clean up expired pending bookings ─────────────────────────────
+exports.cleanupExpiredPendingBookings = functions
   .pubsub.schedule("every 30 minutes")
   .onRun(async () => {
     const cutoff = new Date(Date.now() - 30 * 60 * 1000);
@@ -24,7 +126,6 @@ const cleanupExpiredPendingBookings = functions
     const batch = db.batch();
     for (const doc of expiredSnap.docs) {
       const pending = doc.data();
-      functions.logger.info(`Expiring pending booking: ${doc.id}`);
       batch.delete(doc.ref);
       try {
         const [startTime] = pending.slotTime.split("-");
@@ -49,176 +150,30 @@ const cleanupExpiredPendingBookings = functions
     return null;
   });
 
-exports.cleanupExpiredPendingBookings = cleanupExpiredPendingBookings;
-
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-const DEEPSEEK_KEY = () => process.env.DEEPSEEK_API_KEY || "sk-f617d7a27b2b42579f7093e4857d015c";
-
-// Safe: handles content that may be a string OR an array (vision messages)
-function getTextContent(content) {
-  if (!content) return "";
-  if (typeof content === "string") return content;
-  if (Array.isArray(content)) {
-    return content.filter(p => p.type === "text").map(p => p.text || "").join(" ");
-  }
-  return String(content);
-}
-
-// ─── Multi-source real-time search ────────────────────────────────────────────
-// Priority: Tavily (if key set) → Brave Search (if key set) → DuckDuckGo → Wikipedia
-async function webSearch(query) {
-  // 1. Tavily — best quality, needs key (set TAVILY_API_KEY in Firebase env)
-  const tavilyKey = process.env.TAVILY_API_KEY || "";
-  if (tavilyKey) {
-    try {
-      const r = await axios.post("https://api.tavily.com/search", {
-        api_key: tavilyKey, query, search_depth: "basic",
-        max_results: 5, include_answer: true
-      }, { timeout: 8000 });
-      const answer   = r.data?.answer || "";
-      const snippets = (r.data?.results || []).slice(0, 3)
-        .map(x => `• ${x.title}: ${x.content.substring(0, 300)}`).join("\n");
-      if (answer || snippets) return answer ? `${answer}\n\n${snippets}` : snippets;
-    } catch(e) { functions.logger.warn("[tavily]", e.message); }
-  }
-
-  // 2. Brave Search — 2000 free queries/month (set BRAVE_API_KEY in Firebase env)
-  const braveKey = process.env.BRAVE_API_KEY || "";
-  if (braveKey) {
-    try {
-      const r = await axios.get("https://api.search.brave.com/res/v1/web/search", {
-        params: { q: query, count: 5 },
-        headers: { "Accept": "application/json", "X-Subscription-Token": braveKey },
-        timeout: 8000
-      });
-      const results = r.data?.web?.results || [];
-      if (results.length > 0) {
-        return results.slice(0, 3)
-          .map(x => `• ${x.title}: ${x.description || ""}`)
-          .join("\n");
-      }
-    } catch(e) { functions.logger.warn("[brave]", e.message); }
-  }
-
-  // 3. DuckDuckGo Instant Answer — no key needed
-  try {
-    const r = await axios.get(
-      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
-      { timeout: 6000 }
-    );
-    const d = r.data;
-    const parts = [];
-    if (d.Answer)       parts.push(d.Answer);
-    if (d.AbstractText) parts.push(d.AbstractText);
-    if (d.Definition)   parts.push(d.Definition);
-    // Related topics
-    (d.RelatedTopics || []).slice(0, 3).forEach(t => {
-      if (t.Text) parts.push(`• ${t.Text}`);
-    });
-    if (parts.length > 0) return parts.join("\n");
-  } catch(e) { functions.logger.warn("[ddg]", e.message); }
-
-  // 4. Wikipedia API — no key needed, great for factual/person queries
-  try {
-    // Extract main subject from query for Wikipedia search
-    const wikiQuery = query.replace(/who is|what is|current|president of|pm of|ceo of/gi, "").trim();
-    const searchR = await axios.get("https://en.wikipedia.org/w/api.php", {
-      params: {
-        action: "query", list: "search", srsearch: wikiQuery,
-        format: "json", utf8: 1, srlimit: 3
-      },
-      timeout: 5000
-    });
-    const titles = (searchR.data?.query?.search || []).map(s => s.title);
-    if (titles.length > 0) {
-      // Get extracts for top result
-      const extractR = await axios.get("https://en.wikipedia.org/w/api.php", {
-        params: {
-          action: "query", prop: "extracts", exintro: true,
-          exsentences: 4, titles: titles[0],
-          format: "json", utf8: 1
-        },
-        timeout: 5000
-      });
-      const pages = extractR.data?.query?.pages || {};
-      const page  = Object.values(pages)[0];
-      if (page?.extract) {
-        // Strip HTML tags
-        const text = page.extract.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
-        return `Wikipedia — ${page.title}:\n${text.substring(0, 600)}`;
-      }
-    }
-  } catch(e) { functions.logger.warn("[wikipedia]", e.message); }
-
-  return null; // all sources failed
-}
-
-// Questions that ALWAYS need fresh data — even if no keyword matches
-const ALWAYS_SEARCH_PATTERNS = [
-  /who is (the )?(current |new |present )?/i,
-  /who (is|are|was|were) .*(president|pm|prime minister|ceo|minister|chief|head|leader|governor|mayor|chairman)/i,
-  /president of/i,
-  /prime minister of/i,
-  /(current|latest|recent|new|today|now|2025|2026).*(president|pm|minister|ceo|winner|champion|rank|result|score|rate|price)/i,
-  /(price|rate|value) of/i,
-  /latest (news|update|result|match|score)/i,
-  /who won/i,
-  /election result/i,
-  /ipl|world cup|olympic|cricket|football|match result/i,
-];
-
-function needsRealTimeSearch(messages) {
-  const lastUser = [...messages].reverse().find(m => m.role === "user");
-  if (!lastUser) return false;
-  const text = getTextContent(lastUser.content).toLowerCase();
-
-  // High-confidence patterns — always search
-  if (ALWAYS_SEARCH_PATTERNS.some(p => p.test(text))) return true;
-
-  // Keyword signals
-  const signals = [
-    "who is","who are","current","latest","recent","today","now",
-    "president","prime minister","pm of","ceo of","winner","result",
-    "score","news","2024","2025","2026","what happened","price of",
-    "rate of","stock","election","appointed","resigned","died",
-    "government","minister","officer","rank","topper","exam date",
-    "cutoff","vacancy","notification","admit card","answer key",
-    "result date","ssc","upsc","ibps","rrb","neet","jee"
-  ];
-  return signals.some(s => text.includes(s));
-}
-
-// ─── geminiVision (kept for backward compat, now proxies to DeepSeek) ────────
+// ─── geminiVision — image analysis (unchanged) ────────────────────────────────
 exports.geminiVision = onRequest((req, res) => {
   cors(req, res, async () => {
     try {
-      const GEMINI_KEY   = process.env.GEMINI_API_KEY || "AIzaSyCmzArFqO2Y1-Mm4THkiN7y_1xjogWNqyY";
       const GEMINI_MODEL = "gemini-2.0-flash";
-      const geminiUrl    = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
+      const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY()}`;
 
-      // Accept the body as-is from the client (contents array with inline_data parts)
       const requestBody = {
         contents: req.body.contents || [{
           parts: [{ text: req.body.message || "Describe this image." }]
         }],
         generationConfig: req.body.generationConfig || {
-          maxOutputTokens: 2048,
-          temperature: 0.4
-        }
+          maxOutputTokens: 1024,
+          temperature: 0.4,
+        },
       };
 
       const response = await axios.post(geminiUrl, requestBody, {
         timeout: 30000,
-        headers: { "Content-Type": "application/json" }
+        headers: { "Content-Type": "application/json" },
       });
 
       const text = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) {
-        res.json({ text });
-      } else {
-        // Return raw response so client can debug if needed
-        res.json({ text: "", raw: response.data });
-      }
+      res.json({ text: text || "", raw: text ? undefined : response.data });
     } catch (err) {
       functions.logger.error("[geminiVision]", err.response?.data || err.message);
       res.status(500).json({ error: err.response?.data?.error?.message || err.message });
@@ -227,126 +182,123 @@ exports.geminiVision = onRequest((req, res) => {
 });
 
 // ─── deepseek — main AI endpoint ─────────────────────────────────────────────
+// Routes: real-time queries → Gemini 2.0 Flash | everything else → DeepSeek
+// NO history sent to either API — saves input tokens significantly
 exports.deepseek = onRequest((req, res) => {
   cors(req, res, async () => {
     try {
-      let messages = req.body.messages || [];
-      // ── Allowed DeepSeek models (no random strings) ──────────────────────────
-      const ALLOWED_MODELS = new Set([
-        "deepseek-chat",      // V4 Flash (non-thinking) — default / smart / flash
-        "deepseek-reasoner",  // V4 Flash (thinking/CoT) — pro / vision-pro
-        "deepseek-v4-pro",    // V4 Pro flagship — PAID addon only (₹149/mo)
-      ]);
+      const isPdf    = req.body.isPdf    || false;
+      const isVision = req.body.isVision || false;
+
+      // ── Pick DeepSeek model (allowlist enforced) ──────────────────────────
       const requestedModel = req.body.model || "deepseek-chat";
       const model = ALLOWED_MODELS.has(requestedModel) ? requestedModel : "deepseek-chat";
       if (!ALLOWED_MODELS.has(requestedModel)) {
-        functions.logger.warn(`[deepseek] Blocked disallowed model "${requestedModel}", falling back to deepseek-chat`);
+        functions.logger.warn(`[router] Blocked model "${requestedModel}" → deepseek-chat`);
       }
-      const isPdf   = req.body.isPdf || false;
-      const isVision = req.body.isVision || false;
 
-      // ── PDF: try pdf-parse; gracefully skip if module missing ──────────────
+      // ── Extract ONLY the latest user message (no history) ─────────────────
+      // History is stripped here to save input tokens on every request
+      let messages = req.body.messages || [];
+      const systemMsg  = messages.find(m => m.role === "system");
+      const lastUser   = [...messages].reverse().find(m => m.role === "user");
+      const userText   = getTextContent(lastUser?.content || "").trim();
+      const systemText = getTextContent(systemMsg?.content || "").trim();
+
+      if (!userText) {
+        return res.status(400).json({ error: "No user message found" });
+      }
+
+      // ── PDF path — needs DeepSeek with extracted text ─────────────────────
       if (isPdf && req.body.pdfBase64) {
         try {
-          // pdf-parse must be in functions/package.json: "pdf-parse": "^1.1.1"
-          const pdfParse   = require("pdf-parse");
-          const pdfBuffer  = Buffer.from(req.body.pdfBase64, "base64");
-          const pdfData    = await pdfParse(pdfBuffer);
-          const extracted  = (pdfData.text || "").substring(0, 12000);
+          const pdfParse  = require("pdf-parse");
+          const pdfBuffer = Buffer.from(req.body.pdfBase64, "base64");
+          const pdfData   = await pdfParse(pdfBuffer);
+          const extracted = (pdfData.text || "").substring(0, 10000);
+          const questionMatch = userText.match(/then answer:\s*([\s\S]+)$/i);
+          const userQuestion  = questionMatch ? questionMatch[1].trim() : userText.replace(/\[PDF.*?\]/g, "").trim();
 
-          // Find the plain user question (strip our injected wrapper text)
-          const lastUserIdx = messages.map((m,i) => m.role === "user" ? i : -1).filter(i => i >= 0).pop();
-          if (lastUserIdx !== undefined && extracted) {
-            const raw = getTextContent(messages[lastUserIdx].content);
-            // Pull the actual question after "then answer:"
-            const questionMatch = raw.match(/then answer:\s*([\s\S]+)$/i);
-            const userQuestion  = questionMatch ? questionMatch[1].trim() : raw.replace(/\[PDF.*?\]/g, "").trim();
-            messages[lastUserIdx] = {
-              role: "user",
-              content: `[PDF — ${pdfData.numpages} page(s)]\n\n${extracted}\n\n---\nQuestion: ${userQuestion}`
-            };
-          }
+          const pdfMessages = [
+            { role: "system", content: systemText || "You are a helpful AI exam assistant." },
+            { role: "user",   content: `[PDF — ${pdfData.numpages} pages]\n\n${extracted}\n\n---\nQuestion: ${userQuestion}` },
+          ];
+          const response = await axios.post(
+            "https://api.deepseek.com/chat/completions",
+            { model, messages: pdfMessages, max_tokens: 800, temperature: 0.7 },
+            { headers: { Authorization: `Bearer ${DEEPSEEK_KEY()}` }, timeout: 45000 }
+          );
+          return res.json(response.data);
         } catch (pdfErr) {
-          // pdf-parse not installed or parse failed — fall through with original messages
           functions.logger.warn("[PDF parse skipped]", pdfErr.message);
+          // Fall through to normal DeepSeek call
         }
       }
 
-      // ── Vision: DeepSeek V3 (deepseek-chat) is TEXT-ONLY ──────────────────
-      // Strip image_url parts and keep only text; describe images in prompt
+      // ── Vision path — DeepSeek text only (images handled by geminiVision) ──
       if (isVision) {
-        messages = messages.map(m => {
-          if (!Array.isArray(m.content)) return m;
-          const textParts   = m.content.filter(p => p.type === "text").map(p => p.text || "").join("\n");
-          const imageCount  = m.content.filter(p => p.type === "image_url").length;
-          const imageNotice = imageCount > 0
-            ? `[${imageCount} image(s) attached — describe, analyze, and answer based on the image content]\n\n`
-            : "";
-          return { ...m, content: imageNotice + textParts };
-        });
+        const visionMessages = [
+          { role: "system", content: systemText || "You are a helpful AI exam assistant." },
+          { role: "user",   content: userText },
+        ];
+        const response = await axios.post(
+          "https://api.deepseek.com/chat/completions",
+          { model, messages: visionMessages, max_tokens: 800, temperature: 0.7 },
+          { headers: { Authorization: `Bearer ${DEEPSEEK_KEY()}` }, timeout: 45000 }
+        );
+        return res.json(response.data);
       }
 
-      // ── Always inject today's date so DeepSeek knows current date ──────────
-      const TODAY_STR = new Date().toLocaleDateString("en-IN", {
+      // ── Real-time query → Gemini 2.0 Flash (Google Search grounding) ───────
+      if (isRealTimeQuery(userText)) {
+        functions.logger.info("[router] Real-time → Gemini:", userText.substring(0, 80));
+        try {
+          const geminiAnswer = await callGeminiRealTime(userText, systemText);
+          if (geminiAnswer) {
+            // Return in same shape as DeepSeek so frontend needs no changes
+            return res.json({
+              choices: [{ message: { content: geminiAnswer }, finish_reason: "stop" }],
+              _source: "gemini-2.0-flash",
+            });
+          }
+        } catch (geminiErr) {
+          functions.logger.warn("[Gemini real-time failed, falling back to DeepSeek]", geminiErr.message);
+          // Fall through to DeepSeek
+        }
+      }
+
+      // ── Standard query → DeepSeek (no history, just system + user) ──────────
+      functions.logger.info("[router] Standard → DeepSeek:", userText.substring(0, 80));
+      const today = new Date().toLocaleDateString("en-IN", {
         weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata"
       });
-      const sysIdx0 = messages.findIndex(m => m.role === "system");
-      if (sysIdx0 >= 0) {
-        if (!messages[sysIdx0].content.includes("TODAY IS")) {
-          messages[sysIdx0] = {
-            ...messages[sysIdx0],
-            content: `TODAY IS: ${TODAY_STR}. Your training data has a cutoff — for anything current (who holds a position, recent events, prices, results, exam dates), always rely on real-time data provided below.\n\n${messages[sysIdx0].content}`
-          };
-        }
-      } else {
-        messages = [{
+
+      const deepseekMessages = [
+        {
           role: "system",
-          content: `TODAY IS: ${TODAY_STR}. You have a training cutoff. For current events, who holds positions, recent results, prices, or anything time-sensitive, always use the real-time data injected below. Never guess outdated answers.`
-        }, ...messages];
-      }
+          content: `Today is ${today}.\n\n${systemText || "You are a helpful AI exam assistant for Indian students."}`,
+        },
+        { role: "user", content: userText },
+      ];
 
-      // ── Real-time web search (text only, skip vision/pdf) ────────────────────
-      if (!isPdf && !isVision && needsRealTimeSearch(messages)) {
-        const lastUser = [...messages].reverse().find(m => m.role === "user");
-        if (lastUser) {
-          const rawQ = getTextContent(lastUser.content).trim().substring(0, 150);
-          const searchResult = await webSearch(rawQ);
-          if (searchResult) {
-            const sysIdx = messages.findIndex(m => m.role === "system");
-            const ctx = {
-              role: "system",
-              content: `REAL-TIME WEB SEARCH RESULTS for "${rawQ}":\n${searchResult}\n\nIMPORTANT: Use this to answer accurately. This is more up-to-date than your training data.`
-            };
-            messages = sysIdx >= 0
-              ? [...messages.slice(0, sysIdx + 1), ctx, ...messages.slice(sysIdx + 1)]
-              : [ctx, ...messages];
-            functions.logger.info("[search] injected:", rawQ.substring(0, 60));
-          } else {
-            functions.logger.warn("[search] no results for:", rawQ.substring(0, 60));
-          }
-        }
-      }
-
+      const maxTok = req.body.max_tokens || 600;
       const response = await axios.post(
         "https://api.deepseek.com/chat/completions",
-        { model, messages, max_tokens: req.body.max_tokens || 2048, temperature: 0.7 },
+        { model, messages: deepseekMessages, max_tokens: maxTok, temperature: 0.7 },
         { headers: { Authorization: `Bearer ${DEEPSEEK_KEY()}` }, timeout: 45000 }
       );
-      res.json(response.data);
+      return res.json(response.data);
 
     } catch (err) {
       const dsErr = err.response?.data?.error;
-      const httpStatus = err.response?.status || 500;
-      functions.logger.error("[deepseek] FAILED", {
-        httpStatus,
+      functions.logger.error("[deepseek endpoint] FAILED", {
         message: err.message,
         dsError: dsErr,
         model: req.body?.model || "unknown",
-        msgCount: (req.body?.messages || []).length
       });
       res.status(500).json({
         error: dsErr?.message || err.message,
-        code: dsErr?.code || httpStatus
+        code: dsErr?.code || err.response?.status || 500,
       });
     }
   });
