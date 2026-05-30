@@ -1,18 +1,14 @@
 'use strict';
-// ── CrackWithAI app.js  v13 ──────────────────────────────────
+// ── CrackWithAI app.js  v14 ──────────────────────────────────
 
 // ===== CONFIGURATION =====
 
-// ── API endpoints — always use direct Cloud Run URLs ─────────
-// ── DeepSeek Vision & PDF config (replaces Gemini) ───────────
-// All image + PDF analysis now handled by DeepSeek
-const DEEPSEEK_VISION_MODEL = 'deepseek-chat'; // uses /api/deepseek proxy
-// PDF text extraction proxy endpoint
-const PDF_EXTRACT_PROXY_URL = '/api/deepseek';
-
-// DeepSeek API — direct Cloud Run URL (works on all domains including localhost)
+// ── API endpoints ─────────────────────────────────────────────
+// DeepSeek — text AI (Cloud Run direct URL)
 const DEEPSEEK_API_URL = 'https://deepseek-56khnynjia-uc.a.run.app';
-
+// Gemini Flash — image/vision only (Firebase function proxy)
+const GEMINI_PROXY_URL  = 'https://geminivision-56khnynjia-uc.a.run.app';
+const DEEPSEEK_MODEL    = 'deepseek-chat';
 // ── TEACHER AD REWARD CONFIG ─────────────────────────────────
 const TEACHER_AD_REWARD_KEY = 'crackwith_teacher_ad_reward';
 const TEACHER_AD_REWARD_DURATION_MS = 30 * 60 * 1000; // 30 minutes
@@ -29,8 +25,6 @@ const ADDON_PLAN_VISIONPRO = 'vision_pro_addon';
 const ADDON_PLAN_PREPAIPRO = 'prepaipro_addon';
 // Companion (GF/BF) add-on — ₹49 lifetime
 const ADDON_PLAN_COMPANION = 'companion_addon';
-// DeepSeek Configuration
-const DEEPSEEK_MODEL = 'deepseek-chat';
 
 
 
@@ -1195,68 +1189,166 @@ async function callDeepSeek(userMessage, chatHistory = []) {
  * For Images: converts base64 to a descriptive prompt and sends to DeepSeek
  * DeepSeek V3 / deepseek-chat is used (latest model with real-time web data).
  */
+// ===== IMAGE & PDF ANALYSIS =====
+// Architecture:
+//   Images → Gemini Flash (can actually see images) → extract text/solution
+//   PDFs   → pdf.js client-side text extract → DeepSeek answers
+//   Both   → DeepSeek for final polished answer in user's language/persona
+
+/**
+ * callGeminiForImage — sends base64 image(s) to Gemini Flash via proxy.
+ * Returns the raw extracted text/analysis from Gemini.
+ */
+async function callGeminiForImage(userMessage, imageBase64Array) {
+  // Build Gemini content parts: images first, then the question
+  const parts = [];
+  for (const img of imageBase64Array) {
+    parts.push({
+      inline_data: {
+        mime_type: img.mimeType || 'image/jpeg',
+        data: img.data
+      }
+    });
+  }
+  parts.push({ text: userMessage || 'Please read this image carefully and solve/explain everything you see in it. Show full step-by-step solution.' });
+
+  const body = {
+    contents: [{ parts }],
+    generationConfig: { maxOutputTokens: 2048, temperature: 0.4 }
+  };
+
+  const res = await fetch(GEMINI_PROXY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body)
+  });
+
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(`Gemini Error ${res.status}: ${e?.error || 'Image reading failed'}`);
+  }
+  const data = await res.json();
+  // Proxy returns { text: "..." }
+  return data.text || data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+/**
+ * extractPdfTextClientSide — uses pdf.js (loaded from CDN) to extract text
+ * from a base64-encoded PDF entirely in the browser.
+ */
+async function extractPdfTextClientSide(pdfBase64) {
+  // Lazy-load pdf.js from CDN if not already loaded
+  if (!window.pdfjsLib) {
+    await new Promise((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+      script.onload = resolve;
+      script.onerror = reject;
+      document.head.appendChild(script);
+    });
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  }
+
+  const pdfData   = atob(pdfBase64);
+  const pdfBytes  = new Uint8Array(pdfData.length);
+  for (let i = 0; i < pdfData.length; i++) pdfBytes[i] = pdfData.charCodeAt(i);
+
+  const loadingTask = window.pdfjsLib.getDocument({ data: pdfBytes });
+  const pdf = await loadingTask.promise;
+  let fullText = '';
+
+  const maxPages = Math.min(pdf.numPages, 20); // cap at 20 pages
+  for (let i = 1; i <= maxPages; i++) {
+    const page    = await pdf.getPage(i);
+    const content = await page.getTextContent();
+    const pageText = content.items.map(item => item.str).join(' ');
+    fullText += `\n--- Page ${i} ---\n${pageText}`;
+  }
+  return fullText.trim();
+}
+
+/**
+ * callDeepSeekVision — orchestrates image/PDF analysis:
+ * 1. Images: Gemini reads → DeepSeek polishes the answer
+ * 2. PDFs:   pdf.js extracts text → DeepSeek answers
+ */
 async function callDeepSeekVision(userMessage, chatHistory = [], imageBase64Array = [], pdfBase64 = null) {
   const historyLimit = state.limitHistoryMode ? 2 : 4;
   const systemPrompt = getSystemPrompt();
 
-  // Build base message history — strip any prior image content arrays to plain text
-  const baseMessages = [];
-  if (systemPrompt) baseMessages.push({ role: 'system', content: systemPrompt });
-  chatHistory.slice(-historyLimit).forEach(m => {
-    const content = typeof m.content === 'string'
+  // Sanitised history (no prior image arrays)
+  const baseHistory = chatHistory.slice(-historyLimit).map(m => ({
+    role: m.role === 'user' ? 'user' : 'assistant',
+    content: typeof m.content === 'string'
       ? m.content
       : (Array.isArray(m.content)
           ? m.content.filter(p => p.type === 'text').map(p => p.text).join(' ')
-          : String(m.content));
-    baseMessages.push({ role: m.role === 'user' ? 'user' : 'assistant', content });
-  });
+          : String(m.content || ''))
+  }));
 
-  // ── PDF: send full base64 to backend which runs pdf-parse to extract text ──
-  if (pdfBase64) {
-    const userMsg = `[PDF DOCUMENT ATTACHED]\n\nPlease extract and analyze the full text content from this PDF, then answer: ${userMessage}\n\nPDF Base64 Data: ${pdfBase64}`;
-    const messages = [...baseMessages, { role: 'user', content: userMsg }];
-    const res = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'deepseek-chat', messages,
-        max_tokens: getOptimalMaxTokens(true), temperature: 0.7,
-        isPdf: true, pdfBase64: pdfBase64
-      })
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      throw new Error(`PDF Error ${res.status}: ${e?.error || 'Unknown'}`);
+  // ── IMAGE PATH ─────────────────────────────────────────────
+  if (imageBase64Array.length > 0) {
+    if (dom.aiStatus) dom.aiStatus.innerHTML = '● 👁️ Reading image...';
+
+    let geminiText = '';
+    try {
+      geminiText = await callGeminiForImage(userMessage, imageBase64Array);
+    } catch (geminiErr) {
+      console.warn('[Gemini image read failed]', geminiErr.message);
+      // Fallback: ask DeepSeek to answer based on user description alone
+      return await callDeepSeek(
+        `The user sent an image but vision is temporarily unavailable. Their question was: "${userMessage}". Please help them as best you can and ask them to describe the image content if needed.`,
+        chatHistory
+      );
     }
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || 'Sorry, could not process this PDF. Please try again.';
+
+    if (!geminiText) {
+      return 'Sorry, image ko read nahi kar paya. Please image describe karo ya question type karo.';
+    }
+
+    // Step 2: DeepSeek gives the polished, persona-aware final answer
+    if (dom.aiStatus) dom.aiStatus.innerHTML = '● 🧠 Solving...';
+    const prompt = `The user uploaded an image. Here is what I read from it:
+
+${geminiText}
+
+---
+User's question: ${userMessage || 'Please solve this.'}
+
+Give a complete, step-by-step solution in the user's preferred language. Be thorough.`;
+    return await callDeepSeek(prompt, baseHistory);
   }
 
-  // ── Images: pass as image_url content array; backend strips for text model ──
-  if (imageBase64Array.length > 0) {
-    const imageContents = [
-      ...imageBase64Array.map(img => ({
-        type: 'image_url',
-        image_url: { url: `data:${img.mimeType || 'image/jpeg'};base64,${img.data}` }
-      })),
-      { type: 'text', text: userMessage }
-    ];
-    const visionMessages = [...baseMessages, { role: 'user', content: imageContents }];
-    const res = await fetch(DEEPSEEK_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'deepseek-chat', messages: visionMessages,
-        max_tokens: getOptimalMaxTokens(true), temperature: 0.7,
-        isVision: true
-      })
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      throw new Error(`Vision Error ${res.status}: ${e?.error || 'Unknown'}`);
+  // ── PDF PATH ───────────────────────────────────────────────
+  if (pdfBase64) {
+    if (dom.aiStatus) dom.aiStatus.innerHTML = '● 📄 Reading PDF...';
+
+    let pdfText = '';
+    try {
+      pdfText = await extractPdfTextClientSide(pdfBase64);
+    } catch (pdfErr) {
+      console.warn('[PDF.js extract failed]', pdfErr.message);
+      pdfText = ''; // fall through — DeepSeek will respond without content
     }
-    const data = await res.json();
-    return data.choices?.[0]?.message?.content || 'Sorry, could not analyze this image. Please try again.';
+
+    if (!pdfText || pdfText.length < 20) {
+      return await callDeepSeek(
+        `The user uploaded a PDF but text extraction failed (possibly scanned/image PDF). Their question: "${userMessage}". Please let them know and suggest they copy-paste the text or describe the content.`,
+        baseHistory
+      );
+    }
+
+    if (dom.aiStatus) dom.aiStatus.innerHTML = '● 🧠 Analyzing PDF...';
+    const prompt = `The user uploaded a PDF document. Extracted text (${pdfText.length} chars):
+
+${pdfText.substring(0, 12000)}
+
+---
+User's question: ${userMessage || 'Please summarize and explain this PDF.'}
+
+Give a detailed, helpful answer based on the PDF content.`;
+    return await callDeepSeek(prompt, baseHistory);
   }
 
   return 'No image or PDF found to analyze.';
