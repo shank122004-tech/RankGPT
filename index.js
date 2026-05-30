@@ -193,7 +193,7 @@ exports.geminiVision = onRequest((req, res) => {
   cors(req, res, async () => {
     try {
       const GEMINI_KEY   = process.env.GEMINI_API_KEY || "AIzaSyCmzArFqO2Y1-Mm4THkiN7y_1xjogWNqyY";
-      const GEMINI_MODEL = "gemini-1.5-flash";
+      const GEMINI_MODEL = "gemini-2.0-flash";
       const geminiUrl    = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_KEY}`;
 
       // Accept the body as-is from the client (contents array with inline_data parts)
