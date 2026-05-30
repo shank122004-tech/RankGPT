@@ -10,8 +10,8 @@ const DEEPSEEK_VISION_MODEL = 'deepseek-chat'; // uses /api/deepseek proxy
 // PDF text extraction proxy endpoint
 const PDF_EXTRACT_PROXY_URL = '/api/deepseek';
 
-const DEEPSEEK_API_URL =
-'https://deepseek-56khnynjia-uc.a.run.app';
+// DeepSeek API — direct Cloud Run URL (works on all domains including localhost)
+const DEEPSEEK_API_URL = 'https://deepseek-56khnynjia-uc.a.run.app';
 
 // ── TEACHER AD REWARD CONFIG ─────────────────────────────────
 const TEACHER_AD_REWARD_KEY = 'crackwith_teacher_ad_reward';
@@ -1135,28 +1135,31 @@ async function callDeepSeek(userMessage, chatHistory = []) {
     const cacheKey = `ds:${state.aiLang}:${state.sscMode}:${userMessage.trim().toLowerCase().substring(0, 100)}`;
     if (state.responseCache[cacheKey]) return state.responseCache[cacheKey];
   }
-  
-  // Get Firebase token
+
   const firebaseUser = window._firebaseAuth?.currentUser;
-  if (!firebaseUser) {
-    throw new Error("Please login first");
-  }
-  
+  if (!firebaseUser) throw new Error('Please login first');
   const token = await firebaseUser.getIdToken();
-  
+
   const historyLimit = state.limitHistoryMode ? 2 : 6;
   const messages = [];
   const systemPrompt = getSystemPrompt();
   if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-  chatHistory.slice(-historyLimit).forEach(m => messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content }));
+
+  // Sanitize history — convert any array content to plain string
+  chatHistory.slice(-historyLimit).forEach(m => {
+    let content = m.content;
+    if (Array.isArray(content)) {
+      content = content.filter(p => p.type === 'text').map(p => p.text || '').join(' ');
+    } else if (typeof content !== 'string') {
+      content = String(content || '');
+    }
+    if (content.trim()) messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content });
+  });
   messages.push({ role: 'user', content: userMessage });
-  
+
   const response = await fetch(DEEPSEEK_API_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`
-    },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       model: DEEPSEEK_MODEL,
       messages,
@@ -1167,22 +1170,22 @@ async function callDeepSeek(userMessage, chatHistory = []) {
       shortMode: state.shortResponseMode
     })
   });
-  
-  if (!response.ok) { 
-    const errData = await response.json().catch(() => ({})); 
-    throw new Error(`DeepSeek Error ${response.status}: ${errData?.error?.message || 'Unknown'}`); 
+
+  if (!response.ok) {
+    const errData = await response.json().catch(() => ({}));
+    throw new Error(`DeepSeek Error ${response.status}: ${errData?.error || errData?.error?.message || 'Server error'}`);
   }
   const data = await response.json();
-  const text =
-data.choices[0].message.content;
+  const text = data.choices?.[0]?.message?.content || '';
   const result = text || 'Sorry, kuch ho gaya. Please try again.';
   if (state.cachingEnabled && text) {
     const cacheKey = `ds:${state.aiLang}:${state.sscMode}:${userMessage.trim().toLowerCase().substring(0, 100)}`;
-    state.responseCache[cacheKey] = result; 
+    state.responseCache[cacheKey] = result;
     saveState();
   }
   return result;
 }
+
 
 // ===== DeepSeek Vision & PDF Analysis (replaces Gemini) =====
 /**
@@ -1193,83 +1196,72 @@ data.choices[0].message.content;
  * DeepSeek V3 / deepseek-chat is used (latest model with real-time web data).
  */
 async function callDeepSeekVision(userMessage, chatHistory = [], imageBase64Array = [], pdfBase64 = null) {
-  const firebaseUser = window._firebaseAuth?.currentUser;
-  if (!firebaseUser) throw new Error('Please login first');
-  const token = await firebaseUser.getIdToken();
-
   const historyLimit = state.limitHistoryMode ? 2 : 4;
   const systemPrompt = getSystemPrompt();
-  const messages = [];
-  if (systemPrompt) messages.push({ role: 'system', content: systemPrompt });
-  chatHistory.slice(-historyLimit).forEach(m =>
-    messages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })
-  );
 
-  // ── PDF: send base64 to backend which extracts text then queries DeepSeek ──
+  // Build base message history — strip any prior image content arrays to plain text
+  const baseMessages = [];
+  if (systemPrompt) baseMessages.push({ role: 'system', content: systemPrompt });
+  chatHistory.slice(-historyLimit).forEach(m => {
+    const content = typeof m.content === 'string'
+      ? m.content
+      : (Array.isArray(m.content)
+          ? m.content.filter(p => p.type === 'text').map(p => p.text).join(' ')
+          : String(m.content));
+    baseMessages.push({ role: m.role === 'user' ? 'user' : 'assistant', content });
+  });
+
+  // ── PDF: send full base64 to backend which runs pdf-parse to extract text ──
   if (pdfBase64) {
-    const pdfPrompt = `[PDF DOCUMENT ATTACHED]
-
-The user has uploaded a PDF document (base64 encoded). Please extract and analyze the full text content from this PDF, then answer: ${userMessage}
-
-PDF Base64 Data (first 8000 chars for reference): ${pdfBase64.substring(0, 8000)}`;
-    messages.push({ role: 'user', content: pdfPrompt });
+    const userMsg = `[PDF DOCUMENT ATTACHED]\n\nPlease extract and analyze the full text content from this PDF, then answer: ${userMessage}\n\nPDF Base64 Data: ${pdfBase64}`;
+    const messages = [...baseMessages, { role: 'user', content: userMsg }];
     const res = await fetch(DEEPSEEK_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages,
-        max_tokens: getOptimalMaxTokens(true),
-        temperature: 0.7,
-        mode: state.sscMode,
-        lang: state.aiLang,
-        shortMode: state.shortResponseMode,
-        isPdf: true,
-        pdfBase64: pdfBase64
+        model: 'deepseek-chat', messages,
+        max_tokens: getOptimalMaxTokens(true), temperature: 0.7,
+        isPdf: true, pdfBase64: pdfBase64
       })
     });
-    if (!res.ok) throw new Error(`DeepSeek PDF Error ${res.status}`);
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(`PDF Error ${res.status}: ${e?.error || 'Unknown'}`);
+    }
     const data = await res.json();
     return data.choices?.[0]?.message?.content || 'Sorry, could not process this PDF. Please try again.';
   }
 
-  // ── Images: build a multi-image prompt with base64 inline data ──
+  // ── Images: pass as image_url content array; backend strips for text model ──
   if (imageBase64Array.length > 0) {
-    // DeepSeek V3 supports vision via content array with image_url (base64)
-    const imageContents = imageBase64Array.map(img => ({
-      type: 'image_url',
-      image_url: { url: `data:${img.mimeType};base64,${img.data}` }
-    }));
-    imageContents.push({ type: 'text', text: userMessage });
-
-    const visionMessages = [];
-    if (systemPrompt) visionMessages.push({ role: 'system', content: systemPrompt });
-    chatHistory.slice(-historyLimit).forEach(m =>
-      visionMessages.push({ role: m.role === 'user' ? 'user' : 'assistant', content: m.content })
-    );
-    visionMessages.push({ role: 'user', content: imageContents });
-
+    const imageContents = [
+      ...imageBase64Array.map(img => ({
+        type: 'image_url',
+        image_url: { url: `data:${img.mimeType || 'image/jpeg'};base64,${img.data}` }
+      })),
+      { type: 'text', text: userMessage }
+    ];
+    const visionMessages = [...baseMessages, { role: 'user', content: imageContents }];
     const res = await fetch(DEEPSEEK_API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        model: 'deepseek-chat',
-        messages: visionMessages,
-        max_tokens: getOptimalMaxTokens(true),
-        temperature: 0.7,
-        mode: state.sscMode,
-        lang: state.aiLang,
-        shortMode: state.shortResponseMode,
+        model: 'deepseek-chat', messages: visionMessages,
+        max_tokens: getOptimalMaxTokens(true), temperature: 0.7,
         isVision: true
       })
     });
-    if (!res.ok) throw new Error(`DeepSeek Vision Error ${res.status}`);
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(`Vision Error ${res.status}: ${e?.error || 'Unknown'}`);
+    }
     const data = await res.json();
     return data.choices?.[0]?.message?.content || 'Sorry, could not analyze this image. Please try again.';
   }
 
   return 'No image or PDF found to analyze.';
 }
+
 
 
 // ===== MARKDOWN =====
