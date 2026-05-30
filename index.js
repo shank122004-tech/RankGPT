@@ -54,30 +54,6 @@ exports.cleanupExpiredPendingBookings = cleanupExpiredPendingBookings;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const DEEPSEEK_KEY = () => process.env.DEEPSEEK_API_KEY || "sk-f617d7a27b2b42579f7093e4857d015c";
 
-async function tavilySearch(query) {
-  try {
-    const key = process.env.TAVILY_API_KEY || "";
-    if (!key) throw new Error("no key");
-    const r = await axios.post("https://api.tavily.com/search", {
-      api_key: key, query, search_depth: "basic", max_results: 4, include_answer: true
-    }, { timeout: 8000 });
-    const answer = r.data?.answer || "";
-    const snippets = (r.data?.results || []).map(x => `[${x.title}]: ${x.content}`).join("\n\n");
-    return answer ? `Answer: ${answer}\n\nSources:\n${snippets}` : snippets;
-  } catch(e) {
-    try {
-      const ddg = await axios.get(
-        `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
-        { timeout: 5000 }
-      );
-      const d = ddg.data;
-      if (d.AbstractText) return d.AbstractText;
-      if (d.Answer) return d.Answer;
-    } catch(e2) {}
-    return null;
-  }
-}
-
 // Safe: handles content that may be a string OR an array (vision messages)
 function getTextContent(content) {
   if (!content) return "";
@@ -88,14 +64,127 @@ function getTextContent(content) {
   return String(content);
 }
 
+// ─── Multi-source real-time search ────────────────────────────────────────────
+// Priority: Tavily (if key set) → Brave Search (if key set) → DuckDuckGo → Wikipedia
+async function webSearch(query) {
+  // 1. Tavily — best quality, needs key (set TAVILY_API_KEY in Firebase env)
+  const tavilyKey = process.env.TAVILY_API_KEY || "";
+  if (tavilyKey) {
+    try {
+      const r = await axios.post("https://api.tavily.com/search", {
+        api_key: tavilyKey, query, search_depth: "basic",
+        max_results: 5, include_answer: true
+      }, { timeout: 8000 });
+      const answer   = r.data?.answer || "";
+      const snippets = (r.data?.results || []).slice(0, 3)
+        .map(x => `• ${x.title}: ${x.content.substring(0, 300)}`).join("\n");
+      if (answer || snippets) return answer ? `${answer}\n\n${snippets}` : snippets;
+    } catch(e) { functions.logger.warn("[tavily]", e.message); }
+  }
+
+  // 2. Brave Search — 2000 free queries/month (set BRAVE_API_KEY in Firebase env)
+  const braveKey = process.env.BRAVE_API_KEY || "";
+  if (braveKey) {
+    try {
+      const r = await axios.get("https://api.search.brave.com/res/v1/web/search", {
+        params: { q: query, count: 5 },
+        headers: { "Accept": "application/json", "X-Subscription-Token": braveKey },
+        timeout: 8000
+      });
+      const results = r.data?.web?.results || [];
+      if (results.length > 0) {
+        return results.slice(0, 3)
+          .map(x => `• ${x.title}: ${x.description || ""}`)
+          .join("\n");
+      }
+    } catch(e) { functions.logger.warn("[brave]", e.message); }
+  }
+
+  // 3. DuckDuckGo Instant Answer — no key needed
+  try {
+    const r = await axios.get(
+      `https://api.duckduckgo.com/?q=${encodeURIComponent(query)}&format=json&no_html=1&skip_disambig=1`,
+      { timeout: 6000 }
+    );
+    const d = r.data;
+    const parts = [];
+    if (d.Answer)       parts.push(d.Answer);
+    if (d.AbstractText) parts.push(d.AbstractText);
+    if (d.Definition)   parts.push(d.Definition);
+    // Related topics
+    (d.RelatedTopics || []).slice(0, 3).forEach(t => {
+      if (t.Text) parts.push(`• ${t.Text}`);
+    });
+    if (parts.length > 0) return parts.join("\n");
+  } catch(e) { functions.logger.warn("[ddg]", e.message); }
+
+  // 4. Wikipedia API — no key needed, great for factual/person queries
+  try {
+    // Extract main subject from query for Wikipedia search
+    const wikiQuery = query.replace(/who is|what is|current|president of|pm of|ceo of/gi, "").trim();
+    const searchR = await axios.get("https://en.wikipedia.org/w/api.php", {
+      params: {
+        action: "query", list: "search", srsearch: wikiQuery,
+        format: "json", utf8: 1, srlimit: 3
+      },
+      timeout: 5000
+    });
+    const titles = (searchR.data?.query?.search || []).map(s => s.title);
+    if (titles.length > 0) {
+      // Get extracts for top result
+      const extractR = await axios.get("https://en.wikipedia.org/w/api.php", {
+        params: {
+          action: "query", prop: "extracts", exintro: true,
+          exsentences: 4, titles: titles[0],
+          format: "json", utf8: 1
+        },
+        timeout: 5000
+      });
+      const pages = extractR.data?.query?.pages || {};
+      const page  = Object.values(pages)[0];
+      if (page?.extract) {
+        // Strip HTML tags
+        const text = page.extract.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+        return `Wikipedia — ${page.title}:\n${text.substring(0, 600)}`;
+      }
+    }
+  } catch(e) { functions.logger.warn("[wikipedia]", e.message); }
+
+  return null; // all sources failed
+}
+
+// Questions that ALWAYS need fresh data — even if no keyword matches
+const ALWAYS_SEARCH_PATTERNS = [
+  /who is (the )?(current |new |present )?/i,
+  /who (is|are|was|were) .*(president|pm|prime minister|ceo|minister|chief|head|leader|governor|mayor|chairman)/i,
+  /president of/i,
+  /prime minister of/i,
+  /(current|latest|recent|new|today|now|2025|2026).*(president|pm|minister|ceo|winner|champion|rank|result|score|rate|price)/i,
+  /(price|rate|value) of/i,
+  /latest (news|update|result|match|score)/i,
+  /who won/i,
+  /election result/i,
+  /ipl|world cup|olympic|cricket|football|match result/i,
+];
+
 function needsRealTimeSearch(messages) {
   const lastUser = [...messages].reverse().find(m => m.role === "user");
   if (!lastUser) return false;
   const text = getTextContent(lastUser.content).toLowerCase();
-  const signals = ["who is","who are","current","latest","recent","today","now",
-    "president","prime minister","pm of","ceo of","winner","result","score","news",
-    "2024","2025","2026","what happened","price of","rate of","stock","election",
-    "appointed","resigned","died","government"];
+
+  // High-confidence patterns — always search
+  if (ALWAYS_SEARCH_PATTERNS.some(p => p.test(text))) return true;
+
+  // Keyword signals
+  const signals = [
+    "who is","who are","current","latest","recent","today","now",
+    "president","prime minister","pm of","ceo of","winner","result",
+    "score","news","2024","2025","2026","what happened","price of",
+    "rate of","stock","election","appointed","resigned","died",
+    "government","minister","officer","rank","topper","exam date",
+    "cutoff","vacancy","notification","admit card","answer key",
+    "result date","ssc","upsc","ibps","rrb","neet","jee"
+  ];
   return signals.some(s => text.includes(s));
 }
 
@@ -187,19 +276,43 @@ exports.deepseek = onRequest((req, res) => {
         });
       }
 
-      // ── Real-time search (text messages only, skip vision/pdf) ──────────────
+      // ── Always inject today's date so DeepSeek knows current date ──────────
+      const TODAY_STR = new Date().toLocaleDateString("en-IN", {
+        weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "Asia/Kolkata"
+      });
+      const sysIdx0 = messages.findIndex(m => m.role === "system");
+      if (sysIdx0 >= 0) {
+        if (!messages[sysIdx0].content.includes("TODAY IS")) {
+          messages[sysIdx0] = {
+            ...messages[sysIdx0],
+            content: `TODAY IS: ${TODAY_STR}. Your training data has a cutoff — for anything current (who holds a position, recent events, prices, results, exam dates), always rely on real-time data provided below.\n\n${messages[sysIdx0].content}`
+          };
+        }
+      } else {
+        messages = [{
+          role: "system",
+          content: `TODAY IS: ${TODAY_STR}. You have a training cutoff. For current events, who holds positions, recent results, prices, or anything time-sensitive, always use the real-time data injected below. Never guess outdated answers.`
+        }, ...messages];
+      }
+
+      // ── Real-time web search (text only, skip vision/pdf) ────────────────────
       if (!isPdf && !isVision && needsRealTimeSearch(messages)) {
         const lastUser = [...messages].reverse().find(m => m.role === "user");
         if (lastUser) {
-          const searchQuery  = getTextContent(lastUser.content).replace(/[^\w\s?]/g, " ").trim().substring(0, 120);
-          const searchResult = await tavilySearch(searchQuery);
+          const rawQ = getTextContent(lastUser.content).trim().substring(0, 150);
+          const searchResult = await webSearch(rawQ);
           if (searchResult) {
-            const today = new Date().toISOString().split("T")[0];
-            const ctx   = { role: "system", content: `TODAY: ${today}\n\nREAL-TIME DATA:\n${searchResult}\n\nUse this for accurate, current answers.` };
             const sysIdx = messages.findIndex(m => m.role === "system");
+            const ctx = {
+              role: "system",
+              content: `REAL-TIME WEB SEARCH RESULTS for "${rawQ}":\n${searchResult}\n\nIMPORTANT: Use this to answer accurately. This is more up-to-date than your training data.`
+            };
             messages = sysIdx >= 0
               ? [...messages.slice(0, sysIdx + 1), ctx, ...messages.slice(sysIdx + 1)]
               : [ctx, ...messages];
+            functions.logger.info("[search] injected:", rawQ.substring(0, 60));
+          } else {
+            functions.logger.warn("[search] no results for:", rawQ.substring(0, 60));
           }
         }
       }
