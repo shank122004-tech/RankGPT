@@ -3500,7 +3500,8 @@ document.addEventListener('DOMContentLoaded', initApp);
 (function() {
   // Google TTS config
   const GOOGLE_TTS_URL = 'https://texttospeech.googleapis.com/v1/text:synthesize';
-  const GOOGLE_TTS_KEY = '';
+  // Use same key as voice-ai.js — set window.GOOGLE_TTS_KEY once in voice-ai.js
+  const GOOGLE_TTS_KEY = window.GOOGLE_TTS_KEY || '';
   let currentAudio = null;
   let currentSpeakBtn = null;
 
