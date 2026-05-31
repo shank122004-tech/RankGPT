@@ -587,7 +587,6 @@
 
   // Expose revertModelSelector globally for inline onclick handlers
   window.revertModelSelector = revertModelSelector;
-  window.openCompanionGateModal = openCompanionGateModal;
 
   /* ══════════════════════════════════════════════════════════════
      COMPANION PERSONA GATE
@@ -715,6 +714,10 @@
     }
     _doSelectPersona(persona);
   };
+
+  // Expose globals AFTER all functions are defined
+  window.openCompanionGateModal = openCompanionGateModal;
+  window.payCompanion            = window.payCompanion; // already set above
 
   /* ─── INIT ──────────────────────────────────────────────────── */
   if (document.readyState === 'loading') {
