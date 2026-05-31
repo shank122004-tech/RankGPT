@@ -23,7 +23,7 @@ const VOICE_PLAN_NAME  = 'AI Teacher Pro';
 const GOOGLE_TTS_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
 // ★ PUT YOUR GOOGLE TTS API KEY HERE ★
 // Get one at: https://console.cloud.google.com → Cloud Text-to-Speech API
-const GOOGLE_TTS_KEY = 'YOUR_GOOGLE_TTS_API_KEY';
+const GOOGLE_TTS_KEY = 'AQ.Ab8RN6LKhs4ra7PVk_R74RLyPoEkNzk853w3vYJlHiz69TqPXg';
 window.GOOGLE_TTS_KEY = GOOGLE_TTS_KEY; // expose for app.js speakMessage button
 const PREMIUM_VOICE_NAME = 'Leda';
 const RECOG_LANGS = [
