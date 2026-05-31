@@ -303,3 +303,95 @@ exports.deepseek = onRequest((req, res) => {
     }
   });
 });
+
+// ─── createCashfreeOrder — direct Cashfree API call ──────────────────────────
+// Keys loaded from functions/.env (never from frontend)
+const CF_APP_ID     = () => process.env.CASHFREE_APP_ID     || "";
+const CF_SECRET_KEY = () => process.env.CASHFREE_SECRET_KEY || "";
+const CF_API        = process.env.CASHFREE_ENV === "sandbox"
+  ? "https://sandbox.cashfree.com/pg"
+  : "https://api.cashfree.com/pg";
+
+exports.createCashfreeOrder = onRequest((req, res) => {
+  cors(req, res, async () => {
+    if (req.method === "OPTIONS") return res.status(204).send("");
+    try {
+      const {
+        order_id, amount, plan, currency = "INR",
+        customer_id, customer_name, customer_email,
+        customer_phone = "9999999999", order_note,
+        uid, name, email,
+      } = req.body;
+
+      if (!amount) return res.status(400).json({ error: "amount is required" });
+
+      const orderId   = order_id  || `plan_${plan}_${uid || customer_id}_${Date.now()}`;
+      const custId    = customer_id || uid  || "guest";
+      const custName  = customer_name || name  || "Student";
+      const custEmail = customer_email || email || "student@crackai.in";
+
+      functions.logger.info("[createCashfreeOrder] creating", { orderId, amount, plan });
+
+      const cfRes = await axios.post(`${CF_API}/orders`, {
+        order_id:       orderId,
+        order_amount:   Number(amount),
+        order_currency: currency,
+        order_note:     order_note || plan || orderId,
+        customer_details: {
+          customer_id:    custId,
+          customer_name:  custName,
+          customer_email: custEmail,
+          customer_phone: String(customer_phone),
+        },
+      }, {
+        headers: {
+          "Content-Type":    "application/json",
+          "x-api-version":   "2023-08-01",
+          "x-client-id":     CF_APP_ID(),
+          "x-client-secret": CF_SECRET_KEY(),
+        },
+        timeout: 15000,
+      });
+
+      functions.logger.info("[createCashfreeOrder] OK", { orderId });
+      return res.json({
+        payment_session_id: cfRes.data.payment_session_id,
+        order_id:           cfRes.data.order_id || orderId,
+        order_status:       cfRes.data.order_status,
+      });
+
+    } catch (err) {
+      const cfErr = err.response?.data;
+      functions.logger.error("[createCashfreeOrder] FAILED", cfErr || err.message);
+      return res.status(err.response?.status || 500).json({ error: cfErr?.message || err.message });
+    }
+  });
+});
+
+// ─── verifyPayment ────────────────────────────────────────────────────────────
+exports.verifyPayment = onRequest((req, res) => {
+  cors(req, res, async () => {
+    if (req.method === "OPTIONS") return res.status(204).send("");
+    try {
+      const { order_id } = req.body;
+      if (!order_id) return res.status(400).json({ error: "order_id required" });
+
+      const cfRes = await axios.get(`${CF_API}/orders/${order_id}`, {
+        headers: {
+          "x-api-version":   "2023-08-01",
+          "x-client-id":     CF_APP_ID(),
+          "x-client-secret": CF_SECRET_KEY(),
+        },
+        timeout: 10000,
+      });
+
+      const status = cfRes.data?.order_status;
+      functions.logger.info("[verifyPayment]", { order_id, status });
+      return res.json({ status });
+
+    } catch (err) {
+      functions.logger.error("[verifyPayment] FAILED", err.response?.data || err.message);
+      return res.status(500).json({ error: err.message });
+    }
+  });
+});
