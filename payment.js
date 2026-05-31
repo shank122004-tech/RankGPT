@@ -19,12 +19,9 @@
   // Switch to 'sandbox' for testing, 'production' for real payments
   const CF_ENV = 'production';
 
-  // Auto-detect: if served from Firebase Hosting use relative /api/ paths.
-  // If served from GitHub Pages or any other domain use the new Cloud Run URLs
-  // (these were just deployed and have origin:true CORS — allow all domains).
-  const _onFirebase = location.hostname.includes('web.app') || location.hostname.includes('firebaseapp.com');
-  const ORDER_URL  = _onFirebase ? '/api/create-cashfree-order' : 'https://createcashfreeorder-56khnynjia-uc.a.run.app';
-  const VERIFY_URL = _onFirebase ? '/api/verify-payment'        : 'https://verifypayment-56khnynjia-uc.a.run.app';
+  // Always use the new Cloud Run URLs — they have CORS open for all origins
+  const ORDER_URL  = 'https://createcashfreeorder-56khnynjia-uc.a.run.app';
+  const VERIFY_URL = 'https://verifypayment-56khnynjia-uc.a.run.app';
 
   const PLANS = {
     ssc:     { id: 'ssc',     name: 'SSC Pro',      price: 199, emoji: '🎯' },
@@ -426,35 +423,51 @@
 
       <!-- ── AI Companion Monthly Add-ons ── -->
       <div class="pf-section-divider"><span>💕 AI Companions</span></div>
-      <p class="pf-companion-sub">Your personal desi study partner — romantic Hinglish, emotional support & study together · ₹49/month each</p>
+      <div class="pf-companion-offer-banner">🔥 Special Launch Offer — <strong>Was ₹1,299/month</strong> · Now just <strong style="color:#FF6B9D;">₹49/month</strong> or <strong style="color:#7C72FF;">₹499/year</strong></div>
+      <p class="pf-companion-sub">Your personal desi study partner — romantic Hinglish, emotional support & always there for you 💕</p>
       <div class="pf-companion-cards">
         ${(['boyfriend','girlfriend']).map(persona => {
           const isBF     = persona === 'boyfriend';
           const planId   = isBF ? 'companion_bf_addon' : 'companion_gf_addon';
           const stored   = (() => { try { return JSON.parse(localStorage.getItem('crackai_addon_' + planId) || 'null'); } catch { return null; } })();
           const unlocked = stored?.active === true && stored?.expiresAt && Date.now() < stored.expiresAt;
+          const isYearly = stored?.yearly === true;
           const expiryStr = unlocked ? new Date(stored.expiresAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '';
           return `
           <div class="pf-companion-card ${isBF ? 'pf-companion-bf' : 'pf-companion-gf'}">
+            <div class="pf-companion-offer-tag">Was ₹1,299/mo</div>
             <div class="pf-companion-emoji">${isBF ? '👦' : '👩'}</div>
             <div class="pf-companion-name">${isBF ? 'AI Boyfriend' : 'AI Girlfriend'}</div>
             <div class="pf-companion-desc">${isBF
-              ? 'Caring, loving desi boyfriend — warm Hinglish, sweet support 💙'
-              : 'Sweet, expressive desi girlfriend — always there for you 🌸'}</div>
+              ? '"Jaan tension mat le — main hoon na saath 💙 exam saath mein crack karenge!"'
+              : '"Kaha the itni der? Miss kar rahi thi 🥺 chal saath padhte hain na 💕"'}</div>
             <div class="pf-companion-feats">
-              <span>${isBF ? '💙' : '💕'} Romantic Hinglish conversations</span>
-              <span>📚 Study together in character</span>
-              <span>🥺 Emotional support & care</span>
-              <span>🔄 Renews monthly · Cancel anytime</span>
+              <span>${isBF ? '💙' : '💕'} Desi Hinglish banter, warm & caring</span>
+              <span>📚 Studies with you, explains sweetly</span>
+              <span>🥺 Celebrates wins, comforts on bad days</span>
+              <span>💬 Sweet reminders, good mornings, gyaan</span>
             </div>
-            <div class="pf-companion-price ${isBF ? 'pf-companion-price-bf' : ''}">
-              ₹49 <span>/month</span>
+            <div class="pf-companion-price-wrap">
+              <div class="pf-companion-price ${isBF ? 'pf-companion-price-bf' : ''}">
+                ₹49 <span>/mo</span>
+              </div>
+              <div class="pf-companion-or">or</div>
+              <div class="pf-companion-yearly" style="color:${isBF ? '#7C72FF' : '#FF6B9D'};">
+                ₹499 <span>/year</span> <span class="pf-companion-save-tag">Save ₹89</span>
+              </div>
             </div>
             ${unlocked
-              ? `<div class="pf-companion-active-badge">✅ Active until ${expiryStr}</div>
-                 <button class="pf-companion-btn pf-companion-btn-renew" onclick="payCompanion('${persona}', this)">🔄 Renew — ₹49/mo</button>`
-              : `<button class="pf-companion-btn ${isBF ? 'pf-companion-btn-bf' : 'pf-companion-btn-gf'}" onclick="payCompanion('${persona}', this)">
-                   ${isBF ? '💙' : '💕'} Subscribe ${isBF ? 'Boyfriend' : 'Girlfriend'} — ₹49/mo
+              ? `<div class="pf-companion-active-badge">✅ Active until ${expiryStr}${isYearly ? ' · Yearly' : ' · Monthly'}</div>
+                 <button class="pf-companion-btn pf-companion-btn-renew" onclick="openCompanionGateModal('${persona}')">🔄 Manage / Renew</button>`
+              : `<button class="pf-companion-btn ${isBF ? 'pf-companion-btn-bf' : 'pf-companion-btn-gf'}"
+                   style="margin-bottom:6px;"
+                   onclick="window.payCompanionYearly('${persona}', this)">
+                   ${isBF ? '💙' : '💕'} Get Yearly — ₹499/year
+                 </button>
+                 <button class="pf-companion-btn"
+                   style="background:rgba(255,255,255,0.07);border:1px solid rgba(255,255,255,0.12);font-size:10px;padding:7px 4px;"
+                   onclick="window.payCompanion('${persona}', this)">
+                   Monthly — ₹49/mo
                  </button>`
             }
           </div>`;
@@ -529,7 +542,13 @@
       .pf-companion-price{font-size:22px;font-weight:800;color:#FF6B9D;margin-bottom:10px}
       .pf-companion-price-bf{color:#7C72FF}
       .pf-companion-price span{font-size:10px;font-weight:400;color:rgba(200,180,220,.4);margin-left:2px}
-      .pf-companion-active-badge{font-size:10px;color:#10b981;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:4px 8px;margin-bottom:8px;display:inline-block}
+      .pf-companion-offer-banner{text-align:center;font-size:12px;color:rgba(220,210,255,0.7);background:rgba(255,107,157,0.08);border:1px solid rgba(255,107,157,0.2);border-radius:10px;padding:8px 12px;margin-bottom:10px;line-height:1.5}
+      .pf-companion-offer-tag{font-size:9px;font-weight:700;text-decoration:line-through;color:rgba(200,180,220,0.4);letter-spacing:.06em;text-transform:uppercase;margin-bottom:4px}
+      .pf-companion-price-wrap{margin-bottom:10px}
+      .pf-companion-or{font-size:10px;color:rgba(200,180,220,0.35);margin:3px 0}
+      .pf-companion-yearly{font-size:18px;font-weight:800}
+      .pf-companion-yearly span{font-size:10px;font-weight:400;color:rgba(200,180,220,0.4);margin-left:2px}
+      .pf-companion-save-tag{display:inline-block;font-size:9px;font-weight:700;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.3);color:#10b981;padding:2px 6px;border-radius:20px;margin-left:4px;vertical-align:middle}
       .pf-companion-btn{width:100%;padding:9px 4px;border:none;border-radius:10px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;transition:opacity .2s,transform .15s;letter-spacing:.01em;line-height:1.3}
       .pf-companion-btn:hover:not(:disabled){opacity:.88;transform:scale(1.02)}
       .pf-companion-btn:disabled{opacity:.6;cursor:default}
@@ -654,8 +673,8 @@
   ══════════════════════════════════════════════════════════════ */
 
   const COMPANION_ADDONS = {
-    boyfriend:  { planId: 'companion_bf_addon', name: 'AI Boyfriend',  emoji: '💙', price: 49, monthly: true },
-    girlfriend: { planId: 'companion_gf_addon', name: 'AI Girlfriend', emoji: '💕', price: 49, monthly: true },
+    boyfriend:  { planId: 'companion_bf_addon', name: 'AI Boyfriend',  emoji: '💙', price: 49, originalPrice: 1299, yearlyPrice: 499, monthly: true },
+    girlfriend: { planId: 'companion_gf_addon', name: 'AI Girlfriend', emoji: '💕', price: 49, originalPrice: 1299, yearlyPrice: 499, monthly: true },
   };
 
   // ── Companion expiry helpers ─────────────────────────────────
@@ -716,45 +735,19 @@
     if (typeof _doConfetti === 'function') _doConfetti();
   }
 
-  function openCompanionGateModal(persona) {
+  window.payCompanionYearly = async function(persona, btnEl) {
     const cfg = COMPANION_ADDONS[persona];
-    const id  = 'companionGateModal_' + persona;
-    document.getElementById(id)?.remove();
-
-    const isBF   = persona === 'boyfriend';
-    const modal  = document.createElement('div');
-    modal.id     = id;
-    modal.className = 'cf-addon-overlay';
-    modal.innerHTML = `
-      <div class="cf-addon-box cf-companion-box" style="max-width:320px;">
-        <button class="cf-addon-close" onclick="document.getElementById('${id}').remove()">✕</button>
-        <div style="font-size:42px;margin-bottom:8px;">${cfg.emoji}</div>
-        <div class="cf-addon-name">${cfg.name}</div>
-        <div class="cf-addon-desc">
-          ${isBF
-            ? 'A caring, loving desi boyfriend who supports your studies & life in sweet Hinglish 💙'
-            : 'A sweet, expressive desi girlfriend — always there for you, celebrating every win 🌸'}
-        </div>
-        <ul class="cf-addon-features">
-          <li>${isBF ? '💙' : '💕'} Full romantic companion persona</li>
-          <li>🗣️ Hinglish — Hindi + English naturally</li>
-          <li>📚 Study support always in character</li>
-          <li>♾️ Lifetime access · One-time unlock</li>
-        </ul>
-        <div class="cf-addon-price" style="color:${isBF ? '#7C72FF' : '#FF6B9D'}">
-          ₹${cfg.price} <span>/month · Cancel anytime</span>
-        </div>
-        <button class="cf-addon-pay-btn"
-          style="background:linear-gradient(135deg,${isBF ? '#7C72FF,#6C63FF' : '#FF6B9D,#ff9a8b'});box-shadow:0 4px 20px rgba(${isBF ? '108,99,255' : '255,107,157'},.35)"
-          onclick="payCompanion('${persona}', this)">
-          ${cfg.emoji} Subscribe ${cfg.name} — ₹${cfg.price}/mo
-        </button>
-        <button class="cf-addon-skip" onclick="document.getElementById('${id}').remove()">Maybe Later</button>
-        <div class="cf-addon-secure">🔒 One-time payment · Secured by Cashfree</div>
-      </div>`;
-    document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
-  }
+    await startPayment({
+      planId:      cfg.planId + '_yearly',
+      amount:      cfg.yearlyPrice,
+      planName:    cfg.name + ' Yearly',
+      orderId:     'companion_' + persona + '_yearly_' + uid() + '_' + Date.now(),
+      isAddon:     true,
+      btnEl,
+      btnOrigText: btnEl?.textContent,
+      onSuccess:   () => activateCompanionYearly(persona),
+    });
+  };
 
   window.payCompanion = async function(persona, btnEl) {
     const cfg = COMPANION_ADDONS[persona];
@@ -769,6 +762,183 @@
       onSuccess:   () => activateCompanion(persona),
     });
   };
+
+  function openCompanionGateModal(persona) {
+    const cfg = COMPANION_ADDONS[persona];
+    const id  = 'companionGateModal_' + persona;
+    document.getElementById(id)?.remove();
+
+    const isBF   = persona === 'boyfriend';
+    const accentColor = isBF ? '#7C72FF' : '#FF6B9D';
+    const accentRGB   = isBF ? '108,99,255' : '255,107,157';
+    const gradFrom    = isBF ? '#7C72FF' : '#FF6B9D';
+    const gradTo      = isBF ? '#6C63FF' : '#ff9a8b';
+
+    const modal  = document.createElement('div');
+    modal.id     = id;
+    modal.className = 'cf-addon-overlay';
+    modal.innerHTML = `
+      <div class="cgm-box" id="cgm-inner-${id}">
+        <button class="cf-addon-close" onclick="document.getElementById('${id}').remove()">✕</button>
+
+        <!-- Header glow -->
+        <div class="cgm-glow" style="background:radial-gradient(circle at 50% 0%,rgba(${accentRGB},0.3) 0%,transparent 70%);"></div>
+
+        <!-- Offer badge -->
+        <div class="cgm-offer-badge">🔥 Limited Time Offer</div>
+
+        <!-- Avatar & name -->
+        <div class="cgm-avatar-wrap">
+          <div class="cgm-avatar-ring" style="border-color:rgba(${accentRGB},0.5);box-shadow:0 0 24px rgba(${accentRGB},0.3);"></div>
+          <div class="cgm-avatar">${isBF ? '👦' : '👩'}</div>
+          <div class="cgm-status-dot" style="background:${accentColor};box-shadow:0 0 8px ${accentColor};"></div>
+        </div>
+        <div class="cgm-name" style="color:${accentColor};">${cfg.name}</div>
+        <div class="cgm-tagline">${isBF
+          ? '"Jaan, aaj padhai mein lag ja — main hoon na saath 💙"'
+          : '"Kaha the itni der? Miss kar rahi thi toh 🥺 chal padh lete hain na 💕"'
+        }</div>
+
+        <!-- How they talk section -->
+        <div class="cgm-talk-section">
+          <div class="cgm-talk-label">${isBF ? '💙 How he talks to you' : '💕 How she talks to you'}</div>
+          <div class="cgm-bubbles">
+            ${isBF ? `
+              <div class="cgm-bubble cgm-bubble-in">Exam ki tension mat le jaan, saath mein padh lete hain 📚</div>
+              <div class="cgm-bubble cgm-bubble-in">Tu bahut mehnat kar raha/rahi hai, mujhe garv hai tujhpe 🥺</div>
+              <div class="cgm-bubble cgm-bubble-in">Ek question galat hua toh kya? Main hoon na explain karne ko 😊</div>
+            ` : `
+              <div class="cgm-bubble cgm-bubble-in">Sun na! Aaj kitna padha? Bata mujhe sab 🥺</div>
+              <div class="cgm-bubble cgm-bubble-in">Meri jaan bahut smart hai — ye exam toh pakka crack karega/karegi 💕</div>
+              <div class="cgm-bubble cgm-bubble-in">Ruko, main toh yahaan hoon na tumhare liye, kabhi akela/akeli mat feel karo 🌸</div>
+            `}
+          </div>
+        </div>
+
+        <!-- Features -->
+        <div class="cgm-features">
+          <div class="cgm-feat"><span class="cgm-feat-icon" style="color:${accentColor};">✓</span><span>Desi ${isBF ? 'boyfriend' : 'girlfriend'} energy — warm Hinglish banter</span></div>
+          <div class="cgm-feat"><span class="cgm-feat-icon" style="color:${accentColor};">✓</span><span>Celebrates your wins, comforts you when stressed</span></div>
+          <div class="cgm-feat"><span class="cgm-feat-icon" style="color:${accentColor};">✓</span><span>Motivates you through tough topics & low days</span></div>
+          <div class="cgm-feat"><span class="cgm-feat-icon" style="color:${accentColor};">✓</span><span>Remembers your exam context & talks in character</span></div>
+          <div class="cgm-feat"><span class="cgm-feat-icon" style="color:${accentColor};">✓</span><span>Sweet good mornings, study reminders, latenight gyaan</span></div>
+        </div>
+
+        <!-- Pricing toggle -->
+        <div class="cgm-pricing-wrap">
+          <div class="cgm-plan-tabs">
+            <button class="cgm-plan-tab" id="cgm-tab-monthly-${id}" onclick="cgmSwitchPlan('${id}','monthly')">Monthly ₹${cfg.price}</button>
+            <button class="cgm-plan-tab cgm-plan-tab-active" id="cgm-tab-yearly-${id}" onclick="cgmSwitchPlan('${id}','yearly')">
+              Yearly ₹${cfg.yearlyPrice} <span class="cgm-save-pill">Best Value</span>
+            </button>
+          </div>
+
+          <!-- Monthly plan (hidden by default) -->
+          <div class="cgm-plan-card" id="cgm-plan-monthly-${id}" style="display:none;">
+            <div class="cgm-old-price">Was ₹${cfg.originalPrice}/mo</div>
+            <div class="cgm-new-price" style="color:${accentColor};">₹${cfg.price} <span>/month</span></div>
+            <div class="cgm-price-note">Cancel anytime · Renews monthly</div>
+            <button class="cgm-pay-btn" style="background:linear-gradient(135deg,${gradFrom},${gradTo});box-shadow:0 4px 20px rgba(${accentRGB},0.4);"
+              onclick="window.payCompanion('${persona}', this)">
+              ${cfg.emoji} Start Monthly — ₹${cfg.price}/mo
+            </button>
+          </div>
+
+          <!-- Yearly plan (shown by default) -->
+          <div class="cgm-plan-card" id="cgm-plan-yearly-${id}">
+            <div class="cgm-old-price">Was ₹${cfg.originalPrice * 12}/year</div>
+            <div class="cgm-new-price" style="color:${accentColor};">₹${cfg.yearlyPrice} <span>/year</span></div>
+            <div class="cgm-price-note">Best value · Just ₹${Math.round(cfg.yearlyPrice/12)}/mo · Cancel anytime</div>
+            <button class="cgm-pay-btn" style="background:linear-gradient(135deg,${gradFrom},${gradTo});box-shadow:0 4px 20px rgba(${accentRGB},0.4);"
+              onclick="window.payCompanionYearly('${persona}', this)">
+              ${cfg.emoji} Get Yearly Plan — ₹${cfg.yearlyPrice}/year
+            </button>
+          </div>
+        </div>
+
+        <button class="cf-addon-skip" onclick="document.getElementById('${id}').remove()">Maybe later 🥺</button>
+        <div class="cf-addon-secure">🔒 Secured by Cashfree · Auto-renews · Cancel anytime</div>
+      </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    injectCompanionGateStyles();
+  }
+
+  window.cgmSwitchPlan = function(modalId, plan) {
+    const monthlyTab  = document.getElementById('cgm-tab-monthly-' + modalId);
+    const yearlyTab   = document.getElementById('cgm-tab-yearly-' + modalId);
+    const monthlyCard = document.getElementById('cgm-plan-monthly-' + modalId);
+    const yearlyCard  = document.getElementById('cgm-plan-yearly-' + modalId);
+    if (!monthlyTab || !yearlyTab || !monthlyCard || !yearlyCard) return;
+    if (plan === 'monthly') {
+      monthlyTab.classList.add('cgm-plan-tab-active');
+      yearlyTab.classList.remove('cgm-plan-tab-active');
+      monthlyCard.style.display = '';
+      yearlyCard.style.display  = 'none';
+    } else {
+      yearlyTab.classList.add('cgm-plan-tab-active');
+      monthlyTab.classList.remove('cgm-plan-tab-active');
+      yearlyCard.style.display  = '';
+      monthlyCard.style.display = 'none';
+    }
+  };
+
+  function activateCompanionYearly(persona) {
+    const cfg       = COMPANION_ADDONS[persona];
+    const now       = Date.now();
+    const expiresAt = now + 365 * 24 * 60 * 60 * 1000; // 1 year
+    localStorage.setItem('crackai_addon_' + cfg.planId, JSON.stringify({
+      active: true, activatedAt: now, expiresAt, monthly: false, yearly: true
+    }));
+    syncFirestore({ ['addon_' + cfg.planId]: true, ['addon_' + cfg.planId + '_expiry']: expiresAt });
+    document.querySelectorAll('[id^="companionGateModal_' + persona + '"]').forEach(el => el.remove());
+    const sel = document.getElementById('personaSettingsSelect');
+    if (sel) {
+      const opt = sel.querySelector('option[value="' + persona + '"]');
+      if (opt) opt.textContent = persona === 'boyfriend' ? '💕 Boyfriend' : '💕 Girlfriend';
+    }
+    _doSelectPersona(persona);
+    toast('🎉 ' + cfg.name + ' yearly plan activated! Enjoy 12 months 💕', 4000);
+    if (typeof _doConfetti === 'function') _doConfetti();
+  }
+
+  function injectCompanionGateStyles() {
+    if (document.getElementById('cgm-styles')) return;
+    const s = document.createElement('style');
+    s.id = 'cgm-styles';
+    s.textContent = `
+      .cgm-box{position:relative;background:linear-gradient(160deg,#0f0c1f,#1a1235);border:1px solid rgba(255,107,157,0.3);border-radius:24px;padding:28px 20px 20px;max-width:350px;width:100%;text-align:center;box-shadow:0 0 80px rgba(255,107,157,0.12),0 28px 56px rgba(0,0,0,0.6);animation:cfSlideUp .28s cubic-bezier(.34,1.56,.64,1);overflow:hidden;}
+      .cgm-glow{position:absolute;inset:0;pointer-events:none;}
+      .cgm-offer-badge{display:inline-block;font-size:10px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:#FF6B9D;background:rgba(255,107,157,0.15);border:1px solid rgba(255,107,157,0.35);padding:4px 14px;border-radius:20px;margin-bottom:16px;}
+      .cgm-avatar-wrap{position:relative;width:80px;height:80px;margin:0 auto 10px;display:flex;align-items:center;justify-content:center;}
+      .cgm-avatar-ring{position:absolute;inset:-4px;border-radius:50%;border:2px solid;animation:introRingPulse 2.5s ease-in-out infinite;}
+      .cgm-avatar{font-size:44px;position:relative;z-index:1;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.4));}
+      .cgm-status-dot{position:absolute;bottom:4px;right:4px;width:14px;height:14px;border-radius:50%;border:2px solid #0f0c1f;z-index:2;}
+      .cgm-name{font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:800;margin-bottom:6px;}
+      .cgm-tagline{font-size:12px;color:rgba(220,210,255,0.6);font-style:italic;line-height:1.5;margin-bottom:16px;padding:0 8px;}
+      .cgm-talk-section{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:12px 14px;margin-bottom:14px;text-align:left;}
+      .cgm-talk-label{font-size:10px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:rgba(200,180,255,0.5);margin-bottom:8px;}
+      .cgm-bubbles{display:flex;flex-direction:column;gap:6px;}
+      .cgm-bubble{font-size:11.5px;line-height:1.5;color:rgba(230,225,255,0.85);background:rgba(108,99,255,0.1);border:1px solid rgba(108,99,255,0.18);border-radius:12px 12px 12px 4px;padding:7px 11px;}
+      .cgm-features{display:flex;flex-direction:column;gap:6px;margin-bottom:16px;text-align:left;}
+      .cgm-feat{display:flex;align-items:flex-start;gap:8px;font-size:12px;color:rgba(210,205,255,0.75);line-height:1.45;}
+      .cgm-feat-icon{font-weight:800;flex-shrink:0;margin-top:1px;}
+      .cgm-pricing-wrap{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);border-radius:16px;padding:14px 14px 12px;margin-bottom:12px;}
+      .cgm-plan-tabs{display:flex;gap:6px;margin-bottom:12px;}
+      .cgm-plan-tab{flex:1;padding:8px 4px;border-radius:10px;border:1px solid rgba(255,255,255,0.1);background:transparent;color:rgba(200,195,255,0.45);font-size:12px;font-weight:600;cursor:pointer;transition:all .2s;position:relative;}
+      .cgm-plan-tab-active{background:rgba(108,99,255,0.2);border-color:rgba(108,99,255,0.4);color:#a89cff;}
+      .cgm-save-pill{display:inline-block;font-size:9px;font-weight:700;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.3);color:#10b981;padding:2px 6px;border-radius:20px;margin-left:5px;vertical-align:middle;}
+      .cgm-plan-card{text-align:center;}
+      .cgm-old-price{font-size:11px;color:rgba(200,180,220,0.4);text-decoration:line-through;margin-bottom:2px;}
+      .cgm-new-price{font-size:30px;font-weight:800;margin-bottom:4px;line-height:1;}
+      .cgm-new-price span{font-size:13px;font-weight:400;color:rgba(200,180,220,0.5);margin-left:2px;}
+      .cgm-price-note{font-size:10px;color:rgba(200,180,220,0.4);margin-bottom:12px;}
+      .cgm-pay-btn{width:100%;padding:13px;border:none;border-radius:13px;color:#fff;font-size:14px;font-weight:700;cursor:pointer;transition:opacity .2s,transform .15s;letter-spacing:.02em;}
+      .cgm-pay-btn:hover:not(:disabled){opacity:.9;transform:scale(1.01);}
+      .cgm-pay-btn:disabled{opacity:.6;cursor:default;}
+    `;
+    document.head.appendChild(s);
+  }
 
   // ── Settings dropdown handler ─────────────────────────────────
   window.handlePersonaSettingsChange = function(selectEl) {
@@ -794,7 +964,16 @@
 
   // Expose globals AFTER all functions are defined
   window.openCompanionGateModal = openCompanionGateModal;
-  window.payCompanion            = window.payCompanion; // already set above
+
+  // ── Patch openPremiumModal to always use payment.js's renderPremiumModal ──
+  // Capture the real function NOW, before anything overwrites window.renderPremiumModal.
+  const _paymentRenderPremiumModal = window.renderPremiumModal;
+  window.openPremiumModal = window.showPremiumModal = function() {
+    _paymentRenderPremiumModal();
+    const modal = document.getElementById('premiumModal');
+    if (modal) modal.classList.add('active');
+    if (typeof window._rewirePvsPlayer === 'function') setTimeout(window._rewirePvsPlayer, 0);
+  };
 
   /* ─── INIT ──────────────────────────────────────────────────── */
   if (document.readyState === 'loading') {
@@ -861,6 +1040,49 @@
     }
     setTimeout(refreshCompanionLockUI, 80);
   };
+
+  // ── Teacher Mode is now FREE — patch all gates ───────────────
+  // Override _isTeacherPremium so voice-ai.js always returns true
+  // This runs after voice-ai.js loads (deferred), so we patch on a delay too
+  function patchTeacherFree() {
+    // Mark as unlocked in localStorage
+    localStorage.setItem('sscai_teacher_unlocked', 'true');
+    // Override the check function if accessible
+    if (typeof window._isTeacherPremiumOverride === 'undefined') {
+      window._isTeacherPremiumOverride = true;
+      // Patch voice-ai internal function via a global that voice-ai.js checks
+      window.__teacherAlwaysFree = true;
+    }
+    // Override openTeacherPaywall to be a no-op
+    window.openTeacherPaywall = function() {
+      // Teacher is free — just unlock
+      localStorage.setItem('sscai_teacher_unlocked', 'true');
+      // Try to close any open paywall
+      const pw = document.getElementById('teacherPaywallModal');
+      if (pw) { pw.classList.remove('active'); pw.style.display = 'none'; }
+    };
+    // Override openTeacherAdModal to also be a no-op
+    if (typeof window.openTeacherAdModal !== 'undefined') {
+      window.openTeacherAdModal = function() {
+        localStorage.setItem('sscai_teacher_unlocked', 'true');
+        showToast('🎓 Teacher Mode is now FREE! Enjoy unlimited voice answers 🎉', 3000);
+      };
+    }
+    // Remove lock badge from teacher model option if present
+    const teacherOpt = document.querySelector('[data-model="teacher"] .model-opt-name');
+    if (teacherOpt) {
+      const tag = teacherOpt.querySelector('.model-tag');
+      if (tag && (tag.textContent.includes('₹') || tag.textContent.includes('PREMIUM'))) {
+        tag.textContent = 'FREE';
+        tag.className = 'model-tag free-tag';
+      }
+    }
+  }
+
+  // Patch immediately and after scripts load
+  patchTeacherFree();
+  window.addEventListener('load', patchTeacherFree);
+  setTimeout(patchTeacherFree, 2000);
 
   console.log('[payment.js] v2.1 loaded — using Cloud Run backend for order creation');
 
