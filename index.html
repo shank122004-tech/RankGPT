@@ -54,13 +54,24 @@
     window.dispatchEvent(new Event('firebaseReady'));
   </script>
   <script>
-    // Fallback stub — payment.js overrides this once loaded
-    window.handlePersonaSettingsChange = window.handlePersonaSettingsChange || function(sel) {
+    // Stub — payment.js overwrites this on load.
+    // If user somehow fires change before payment.js loads, queue it safely.
+    window.handlePersonaSettingsChange = function(sel) {
       var v = sel.value;
-      if ((v === 'boyfriend' || v === 'girlfriend') && typeof window.openCompanionGateModal === 'function') {
-        var prev = (typeof state !== 'undefined' ? state.aiPersona : null) || '';
+      // Revert immediately to be safe
+      if (v === 'boyfriend' || v === 'girlfriend') {
+        var prev = '';
+        try { prev = (state && state.aiPersona) || ''; } catch(e){}
         sel.value = prev;
-        window.openCompanionGateModal(v);
+        // Try payment.js gate, retry if not ready yet
+        var tryOpen = function() {
+          if (typeof window.openCompanionGateModal === 'function') {
+            window.openCompanionGateModal(v);
+          } else {
+            setTimeout(tryOpen, 100);
+          }
+        };
+        tryOpen();
       } else if (typeof window.selectPersona === 'function') {
         window.selectPersona(v);
       }
@@ -1369,7 +1380,7 @@
         <div class="ps-card-badge" style="background:linear-gradient(135deg,#FF6B9D,#ff9a8b);color:#fff;">💕 FREE</div>
         <div class="ps-card-emoji">👦</div>
         <div class="ps-card-name" style="color:#FF6B9D;">Boyfriend</div>
-        <div class="ps-card-desc">Loving, caring, flirty desi boyfriend who supports you through studies & life</div>
+        <div class="ps-card-desc">Loving, caring, flirty desi boyfriend who supports you through studies & life</div><div style="font-size:10px;color:#7C72FF;font-weight:700;margin-top:4px;">🔒 ₹49 one-time unlock</div>
         <div class="ps-card-example">"jaan aaj bahut acchi lag rahi ho 🥺 chal saath padhte hain 📚❤️"</div>
       </button>
 
@@ -1377,7 +1388,7 @@
         <div class="ps-card-badge" style="background:linear-gradient(135deg,#a855f7,#FF6B9D);color:#fff;">💕 FREE</div>
         <div class="ps-card-emoji">👩</div>
         <div class="ps-card-name" style="color:#FF6B9D;">Girlfriend</div>
-        <div class="ps-card-desc">Sweet, expressive, slightly dramatic desi girlfriend — always there for you</div>
+        <div class="ps-card-desc">Sweet, expressive, slightly dramatic desi girlfriend — always there for you</div><div style="font-size:10px;color:#FF6B9D;font-weight:700;margin-top:4px;">🔒 ₹49 one-time unlock</div>
         <div class="ps-card-example">"kaha the itni der? miss kar rahi thi toh 🥺 baat karo na mujhse 💕"</div>
       </button>
 
