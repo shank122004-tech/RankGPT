@@ -258,7 +258,7 @@
   }
 
   /* ─── CORE PAYMENT FLOW ─────────────────────────────────────── */
-  async function startPayment({ planId, amount, planName, orderId, isAddon = false, btnEl, btnOrigText }) {
+  async function startPayment({ planId, amount, planName, orderId, isAddon = false, btnEl, btnOrigText, onSuccess }) {
     if (!currentUser()) {
       toast('Please login first to purchase!');
       return;
@@ -291,7 +291,8 @@
       if (result?.paymentDetails || result?.error === null) {
         const verify = await verifyOrder(orderId);
         if (verify?.status === 'PAID') {
-          isAddon ? activateAddon(planId) : activatePlan(planId);
+          if (onSuccess) onSuccess();
+          else isAddon ? activateAddon(planId) : activatePlan(planId);
           localStorage.removeItem('crackai_pending_pay');
           return;
         }
@@ -301,7 +302,8 @@
       toast('⏳ Verifying payment…');
       pollUntilPaid(orderId, {
         onPaid: () => {
-          isAddon ? activateAddon(planId) : activatePlan(planId);
+          if (onSuccess) onSuccess();
+          else isAddon ? activateAddon(planId) : activatePlan(planId);
           localStorage.removeItem('crackai_pending_pay');
         },
         onFailed: (reason) => {
@@ -331,7 +333,9 @@
       }
       verifyOrder(p.orderId).then(result => {
         if (result?.status === 'PAID') {
-          p.isAddon ? activateAddon(p.planId) : activatePlan(p.planId);
+          if (p.planId === 'companion_bf_addon')  activateCompanion('boyfriend');
+          else if (p.planId === 'companion_gf_addon') activateCompanion('girlfriend');
+          else p.isAddon ? activateAddon(p.planId) : activatePlan(p.planId);
           localStorage.removeItem('crackai_pending_pay');
         }
       });
@@ -583,6 +587,115 @@
 
   // Expose revertModelSelector globally for inline onclick handlers
   window.revertModelSelector = revertModelSelector;
+
+  /* ══════════════════════════════════════════════════════════════
+     COMPANION PERSONA GATE
+     Intercepts selectPersona('boyfriend') / selectPersona('girlfriend')
+     and requires payment before activating.
+  ══════════════════════════════════════════════════════════════ */
+
+  const COMPANION_ADDONS = {
+    boyfriend: { planId: 'companion_bf_addon',  name: 'AI Boyfriend', emoji: '💙', price: 49 },
+    girlfriend: { planId: 'companion_gf_addon', name: 'AI Girlfriend', emoji: '💕', price: 49 },
+  };
+
+  function isCompanionUnlocked(persona) {
+    try {
+      const key = 'crackai_addon_' + COMPANION_ADDONS[persona].planId;
+      const d = JSON.parse(localStorage.getItem(key) || 'null');
+      return d?.active === true;
+    } catch { return false; }
+  }
+
+  function activateCompanion(persona) {
+    const cfg = COMPANION_ADDONS[persona];
+    localStorage.setItem('crackai_addon_' + cfg.planId, JSON.stringify({ active: true, activatedAt: Date.now() }));
+    syncFirestore({ ['addon_' + cfg.planId]: true });
+    // Now actually select the persona via original function
+    if (typeof _origSelectPersona === 'function') _origSelectPersona(persona);
+    toast(`🎉 ${cfg.name} unlocked! Enjoy your companion 💕`, 3500);
+    if (typeof _doConfetti === 'function') _doConfetti();
+  }
+
+  function openCompanionGateModal(persona) {
+    const cfg = COMPANION_ADDONS[persona];
+    const id  = 'companionGateModal_' + persona;
+    document.getElementById(id)?.remove();
+
+    const modal = document.createElement('div');
+    modal.id = id;
+    modal.className = 'cf-addon-overlay';
+    modal.innerHTML = `
+      <div class="cf-addon-box cf-companion-box" style="max-width:320px;">
+        <button class="cf-addon-close"
+          onclick="document.getElementById('${id}').remove()">✕</button>
+
+        <div style="font-size:42px;margin-bottom:8px;">${cfg.emoji}</div>
+        <div class="cf-addon-name">${cfg.name}</div>
+        <div class="cf-addon-desc">
+          ${persona === 'boyfriend'
+            ? 'A caring, loving desi boyfriend who supports you through studies & life — in sweet Hinglish 💙'
+            : 'A sweet, expressive desi girlfriend — always there for you, celebrating every win 🌸'}
+        </div>
+
+        <ul class="cf-addon-features">
+          <li>${persona === 'boyfriend' ? '💙' : '💕'} Full romantic companion persona</li>
+          <li>🗣️ Hinglish — Hindi + English naturally mixed</li>
+          <li>📚 Study support in character — always</li>
+          <li>♾️ Lifetime access · One-time unlock</li>
+        </ul>
+
+        <div class="cf-addon-price" style="${persona === 'girlfriend' ? 'color:#FF6B9D' : 'color:#7C72FF'}">
+          ₹${cfg.price} <span>one-time · Lifetime</span>
+        </div>
+
+        <button class="cf-addon-pay-btn ${persona === 'girlfriend' ? 'cf-companion-btn' : ''}"
+                style="${persona === 'boyfriend' ? 'background:linear-gradient(135deg,#7C72FF,#6C63FF);box-shadow:0 4px 20px rgba(108,99,255,.35)' : ''}"
+                onclick="payCompanion('${persona}', this)">
+          ${cfg.emoji} Unlock ${cfg.name} — ₹${cfg.price}
+        </button>
+        <button class="cf-addon-skip"
+          onclick="document.getElementById('${id}').remove()">Maybe Later</button>
+        <div class="cf-addon-secure">🔒 One-time payment · Secured by Cashfree</div>
+      </div>`;
+
+    document.body.appendChild(modal);
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+  }
+
+  window.payCompanion = async function(persona, btnEl) {
+    const cfg     = COMPANION_ADDONS[persona];
+    const orderId = `companion_${persona}_${uid()}_${Date.now()}`;
+    const origText = btnEl?.textContent;
+    await startPayment({
+      planId:   cfg.planId,
+      amount:   cfg.price,
+      planName: cfg.name,
+      orderId,
+      isAddon:  true,
+      btnEl,
+      btnOrigText: origText,
+      onSuccess: () => activateCompanion(persona),
+    });
+  };
+
+  // Override selectPersona globally to intercept BF/GF before app.js handles it
+  const _origSelectPersona = window.selectPersona;
+  window.selectPersona = function(persona) {
+    if ((persona === 'boyfriend' || persona === 'girlfriend')) {
+      if (!isCompanionUnlocked(persona)) {
+        // Close persona selector modal first
+        if (typeof closePersonaSelector === 'function') closePersonaSelector();
+        // Also revert settings dropdown if it was changed
+        const sel = document.getElementById('personaSettingsSelect');
+        if (sel && sel.value === persona) sel.value = window._state?.aiPersona || '';
+        openCompanionGateModal(persona);
+        return; // block original
+      }
+    }
+    // Free persona or already unlocked — pass through
+    if (typeof _origSelectPersona === 'function') _origSelectPersona(persona);
+  };
 
   /* ─── INIT ──────────────────────────────────────────────────── */
   if (document.readyState === 'loading') {
