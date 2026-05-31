@@ -159,6 +159,48 @@
   }
 
   /* ─── ACTIVATE ADDON ────────────────────────────────────────── */
+  /* ─── MODEL GUARD HELPERS ──────────────────────────────────── */
+  // Revert model selector UI back to the previous valid model
+  // when user cancels payment without completing it.
+  function revertModelSelector() {
+    try {
+      const dropdown   = document.querySelector('.model-selector-dropdown, #modelDropdown, [class*="model-dropdown"]');
+      const allOptions = document.querySelectorAll('.model-option[data-model]');
+      if (!allOptions.length) return;
+
+      // Find whichever option is currently "active" (the locked one user clicked)
+      // and revert it. The safe fallback model is 'smart'.
+      const safeModel = 'smart';
+
+      allOptions.forEach(opt => {
+        const m   = opt.dataset.model;
+        const chk = opt.querySelector('.model-opt-check');
+        if (m === safeModel) {
+          opt.classList.add('active');
+          opt.setAttribute('aria-selected', 'true');
+          if (chk) chk.textContent = '✓';
+        } else {
+          opt.classList.remove('active');
+          opt.setAttribute('aria-selected', 'false');
+          if (chk) chk.textContent = '';
+        }
+      });
+
+      // Reset global model
+      window._selectedDeepSeekModel = 'deepseek-chat';
+
+      // Reset selector button label
+      const selectorIcon  = document.getElementById('modelSelectorIcon');
+      const selectorLabel = document.getElementById('modelSelectorLabel');
+      const chipIcon      = document.querySelector('.model-chip-icon, #chipIcon');
+      const chipName      = document.querySelector('.model-chip-name, #chipName');
+      if (selectorIcon)  selectorIcon.textContent  = '⚡';
+      if (selectorLabel) selectorLabel.textContent = 'PrepAI Smart';
+      if (chipIcon) chipIcon.textContent = '⚡';
+      if (chipName) chipName.textContent = 'Smart';
+    } catch (e) {}
+  }
+
   function activateAddon(planId) {
     const addon = ADDONS[planId];
     localStorage.setItem('crackai_addon_' + planId, JSON.stringify({ active: true, activatedAt: Date.now() }));
@@ -172,6 +214,45 @@
     if (planId === 'v4pro_addon') {
       document.getElementById('v4ProModal')?.remove();
       window._selectedDeepSeekModel = 'deepseek-v4-pro';
+      // Update UI to show V4 Pro as selected
+      try {
+        document.querySelectorAll('.model-option[data-model]').forEach(opt => {
+          const chk = opt.querySelector('.model-opt-check');
+          if (opt.dataset.model === 'v4-pro') {
+            opt.classList.add('active'); opt.setAttribute('aria-selected','true');
+            if (chk) chk.textContent = '✓';
+          } else {
+            opt.classList.remove('active'); opt.setAttribute('aria-selected','false');
+            if (chk) chk.textContent = '';
+          }
+        });
+        const selectorIcon  = document.getElementById('modelSelectorIcon');
+        const selectorLabel = document.getElementById('modelSelectorLabel');
+        if (selectorIcon)  selectorIcon.textContent  = '🚀';
+        if (selectorLabel) selectorLabel.textContent = 'V4 Pro';
+      } catch(e) {}
+    }
+    if (planId === 'prepaipro_addon') {
+      document.getElementById('addonModal')?.remove();
+      // Switch selector to Pro model after unlock
+      try {
+        document.querySelectorAll('.model-option[data-model]').forEach(opt => {
+          const chk = opt.querySelector('.model-opt-check');
+          if (opt.dataset.model === 'pro') {
+            opt.classList.add('active'); opt.setAttribute('aria-selected','true');
+            if (chk) chk.textContent = '✓';
+          } else {
+            opt.classList.remove('active'); opt.setAttribute('aria-selected','false');
+            if (chk) chk.textContent = '';
+          }
+        });
+        window._selectedDeepSeekModel = 'deepseek-reasoner';
+        const selectorIcon  = document.getElementById('modelSelectorIcon');
+        const selectorLabel = document.getElementById('modelSelectorLabel');
+        if (selectorIcon)  selectorIcon.textContent  = '✨';
+        if (selectorLabel) selectorLabel.textContent = 'PrepAI Pro';
+      } catch(e) {}
+      return;
     }
     document.getElementById('addonModal')?.remove();
   }
@@ -446,7 +527,7 @@
     modal.className = 'cf-addon-overlay';
     modal.innerHTML = `
       <div class="cf-addon-box ${boxClass}">
-        <button class="cf-addon-close" onclick="document.getElementById('${id}').remove()">✕</button>
+        <button class="cf-addon-close" onclick="document.getElementById('${id}').remove();revertModelSelector()">✕</button>
         ${badge ? `<div class="cf-v4pro-badge">${badge}</div>` : ''}
         <div class="cf-addon-icon">${icon}</div>
         <div class="cf-addon-name">${title}</div>
@@ -458,11 +539,11 @@
         <button class="cf-addon-pay-btn ${btnClass}" onclick="payAddon('${planId}', this)">
           ${btnText}
         </button>
-        <button class="cf-addon-skip" onclick="document.getElementById('${id}').remove()">Maybe Later</button>
+        <button class="cf-addon-skip" onclick="document.getElementById('${id}').remove();revertModelSelector()">Maybe Later</button>
         <div class="cf-addon-secure">🔒 Secured by Cashfree Payments</div>
       </div>`;
     document.body.appendChild(modal);
-    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+    modal.addEventListener('click', e => { if (e.target === modal) { modal.remove(); revertModelSelector(); } });
     injectAddonStyles();
   }
 
@@ -499,6 +580,9 @@
     `;
     document.head.appendChild(s);
   }
+
+  // Expose revertModelSelector globally for inline onclick handlers
+  window.revertModelSelector = revertModelSelector;
 
   /* ─── INIT ──────────────────────────────────────────────────── */
   if (document.readyState === 'loading') {
