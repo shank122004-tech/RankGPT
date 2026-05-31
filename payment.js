@@ -591,44 +591,52 @@
 
   /* ══════════════════════════════════════════════════════════════
      COMPANION PERSONA GATE
-     Intercepts selectPersona('boyfriend') / selectPersona('girlfriend')
-     and requires payment before activating.
   ══════════════════════════════════════════════════════════════ */
 
   const COMPANION_ADDONS = {
-    boyfriend: { planId: 'companion_bf_addon',  name: 'AI Boyfriend', emoji: '💙', price: 49 },
+    boyfriend:  { planId: 'companion_bf_addon', name: 'AI Boyfriend',  emoji: '💙', price: 49 },
     girlfriend: { planId: 'companion_gf_addon', name: 'AI Girlfriend', emoji: '💕', price: 49 },
   };
 
   function isCompanionUnlocked(persona) {
     try {
-      const key = 'crackai_addon_' + COMPANION_ADDONS[persona].planId;
-      const d = JSON.parse(localStorage.getItem(key) || 'null');
+      const d = JSON.parse(localStorage.getItem('crackai_addon_' + COMPANION_ADDONS[persona].planId) || 'null');
       return d?.active === true;
     } catch { return false; }
   }
 
+  // Capture app.js's original selectPersona NOW — before we override it
+  // Must be declared before handlePersonaSettingsChange and the override below
+  const _origSelectPersona = window.selectPersona;
+
+  function _doSelectPersona(persona) {
+    // Always call app.js original — never our own override
+    if (typeof _origSelectPersona === 'function') _origSelectPersona(persona);
+  }
+
   function activateCompanion(persona) {
     const cfg = COMPANION_ADDONS[persona];
+    // Save to localStorage + Firestore
     localStorage.setItem('crackai_addon_' + cfg.planId, JSON.stringify({ active: true, activatedAt: Date.now() }));
     syncFirestore({ ['addon_' + cfg.planId]: true });
 
-    // Remove 🔒 from the settings dropdown option
+    // Close gate modal
+    document.getElementById('companionGateModal_' + persona)?.remove();
+
+    // Remove 🔒 from settings dropdown option
     const sel = document.getElementById('personaSettingsSelect');
     if (sel) {
-      const opt = sel.querySelector(`option[value="${persona}"]`);
-      if (opt) opt.textContent = opt.textContent.replace(' 🔒', '');
+      const opt = sel.querySelector('option[value="' + persona + '"]');
+      if (opt) opt.textContent = persona === 'boyfriend' ? '💕 Boyfriend' : '💕 Girlfriend';
     }
 
-    // Remove lock badge from persona card
-    document.querySelectorAll(`[data-companion-lock="true"]`).forEach(card => {
-      const badge = card.querySelector('.companion-lock-badge');
-      if (badge) badge.remove();
-    });
+    // Remove lock badges from persona cards
+    document.querySelectorAll('.companion-lock-badge').forEach(b => b.remove());
 
-    // Now select the persona via original function
-    if (typeof _origSelectPersona === 'function') _origSelectPersona(persona);
-    toast(`🎉 ${cfg.name} unlocked! Enjoy your companion 💕`, 3500);
+    // Actually activate the persona via app.js
+    _doSelectPersona(persona);
+
+    toast('🎉 ' + cfg.name + ' unlocked! Enjoy your companion 💕', 3500);
     if (typeof _doConfetti === 'function') _doConfetti();
   }
 
@@ -637,94 +645,75 @@
     const id  = 'companionGateModal_' + persona;
     document.getElementById(id)?.remove();
 
-    const modal = document.createElement('div');
-    modal.id = id;
+    const isBF   = persona === 'boyfriend';
+    const modal  = document.createElement('div');
+    modal.id     = id;
     modal.className = 'cf-addon-overlay';
     modal.innerHTML = `
       <div class="cf-addon-box cf-companion-box" style="max-width:320px;">
-        <button class="cf-addon-close"
-          onclick="document.getElementById('${id}').remove()">✕</button>
-
+        <button class="cf-addon-close" onclick="document.getElementById('${id}').remove()">✕</button>
         <div style="font-size:42px;margin-bottom:8px;">${cfg.emoji}</div>
         <div class="cf-addon-name">${cfg.name}</div>
         <div class="cf-addon-desc">
-          ${persona === 'boyfriend'
-            ? 'A caring, loving desi boyfriend who supports you through studies & life — in sweet Hinglish 💙'
+          ${isBF
+            ? 'A caring, loving desi boyfriend who supports your studies & life in sweet Hinglish 💙'
             : 'A sweet, expressive desi girlfriend — always there for you, celebrating every win 🌸'}
         </div>
-
         <ul class="cf-addon-features">
-          <li>${persona === 'boyfriend' ? '💙' : '💕'} Full romantic companion persona</li>
-          <li>🗣️ Hinglish — Hindi + English naturally mixed</li>
-          <li>📚 Study support in character — always</li>
+          <li>${isBF ? '💙' : '💕'} Full romantic companion persona</li>
+          <li>🗣️ Hinglish — Hindi + English naturally</li>
+          <li>📚 Study support always in character</li>
           <li>♾️ Lifetime access · One-time unlock</li>
         </ul>
-
-        <div class="cf-addon-price" style="${persona === 'girlfriend' ? 'color:#FF6B9D' : 'color:#7C72FF'}">
+        <div class="cf-addon-price" style="color:${isBF ? '#7C72FF' : '#FF6B9D'}">
           ₹${cfg.price} <span>one-time · Lifetime</span>
         </div>
-
-        <button class="cf-addon-pay-btn ${persona === 'girlfriend' ? 'cf-companion-btn' : ''}"
-                style="${persona === 'boyfriend' ? 'background:linear-gradient(135deg,#7C72FF,#6C63FF);box-shadow:0 4px 20px rgba(108,99,255,.35)' : ''}"
-                onclick="payCompanion('${persona}', this)">
+        <button class="cf-addon-pay-btn"
+          style="background:linear-gradient(135deg,${isBF ? '#7C72FF,#6C63FF' : '#FF6B9D,#ff9a8b'});box-shadow:0 4px 20px rgba(${isBF ? '108,99,255' : '255,107,157'},.35)"
+          onclick="payCompanion('${persona}', this)">
           ${cfg.emoji} Unlock ${cfg.name} — ₹${cfg.price}
         </button>
-        <button class="cf-addon-skip"
-          onclick="document.getElementById('${id}').remove()">Maybe Later</button>
+        <button class="cf-addon-skip" onclick="document.getElementById('${id}').remove()">Maybe Later</button>
         <div class="cf-addon-secure">🔒 One-time payment · Secured by Cashfree</div>
       </div>`;
-
     document.body.appendChild(modal);
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
   }
 
   window.payCompanion = async function(persona, btnEl) {
-    const cfg     = COMPANION_ADDONS[persona];
-    const orderId = `companion_${persona}_${uid()}_${Date.now()}`;
-    const origText = btnEl?.textContent;
+    const cfg = COMPANION_ADDONS[persona];
     await startPayment({
-      planId:   cfg.planId,
-      amount:   cfg.price,
-      planName: cfg.name,
-      orderId,
-      isAddon:  true,
+      planId:      cfg.planId,
+      amount:      cfg.price,
+      planName:    cfg.name,
+      orderId:     'companion_' + persona + '_' + uid() + '_' + Date.now(),
+      isAddon:     true,
       btnEl,
-      btnOrigText: origText,
-      onSuccess: () => activateCompanion(persona),
+      btnOrigText: btnEl?.textContent,
+      onSuccess:   () => activateCompanion(persona),
     });
   };
 
-  // ── handlePersonaSettingsChange — called by settings <select> ──
-  // Reverts dropdown cleanly without triggering selectPersona('') side-effects
+  // ── Settings dropdown handler ─────────────────────────────────
   window.handlePersonaSettingsChange = function(selectEl) {
     const persona   = selectEl.value;
     const prevValue = (typeof state !== 'undefined' ? state.aiPersona : null) || '';
-
-    if (persona === 'boyfriend' || persona === 'girlfriend') {
-      if (!isCompanionUnlocked(persona)) {
-        // Revert dropdown to previous value immediately — before any modal opens
-        selectEl.value = prevValue;
-        openCompanionGateModal(persona);
-        return;
-      }
+    if ((persona === 'boyfriend' || persona === 'girlfriend') && !isCompanionUnlocked(persona)) {
+      selectEl.value = prevValue; // revert immediately
+      openCompanionGateModal(persona);
+      return;
     }
-    // Free or already unlocked — call original
-    if (typeof _origSelectPersona === 'function') _origSelectPersona(persona);
-    else if (typeof window.selectPersona === 'function') window.selectPersona(persona);
+    _doSelectPersona(persona);
   };
 
-  // ── Intercept selectPersona globally (for persona modal card clicks) ──
-  const _origSelectPersona = window.selectPersona;
+  // ── Persona modal card click interceptor ──────────────────────
   window.selectPersona = function(persona) {
-    if (persona === 'boyfriend' || persona === 'girlfriend') {
-      if (!isCompanionUnlocked(persona)) {
-        if (typeof closePersonaSelector === 'function') closePersonaSelector();
-        openCompanionGateModal(persona);
-        return; // block — do NOT call original
-      }
+    if ((persona === 'boyfriend' || persona === 'girlfriend') && !isCompanionUnlocked(persona)) {
+      if (typeof closePersonaSelector === 'function') closePersonaSelector();
+      openCompanionGateModal(persona);
+      return;
     }
-    // Free or unlocked — pass through to app.js original
-    if (typeof _origSelectPersona === 'function') _origSelectPersona(persona);
+    _doSelectPersona(persona);
   };
 
   /* ─── INIT ──────────────────────────────────────────────────── */
@@ -782,11 +771,15 @@
     setTimeout(refreshCompanionLockUI, 800);
   }
 
-  // Patch showPersonaSelector to refresh badges each time modal opens
+  // Patch showPersonaSelector to refresh lock badges each time modal opens
   const _origShowPersonaSelector = window.showPersonaSelector;
   window.showPersonaSelector = function() {
     if (typeof _origShowPersonaSelector === 'function') _origShowPersonaSelector();
-    setTimeout(refreshCompanionLockUI, 50);
+    else {
+      const m = document.getElementById('personaSelectorModal');
+      if (m) m.classList.add('active');
+    }
+    setTimeout(refreshCompanionLockUI, 80);
   };
 
   console.log('[payment.js] v2.1 loaded — using Cloud Run backend for order creation');
