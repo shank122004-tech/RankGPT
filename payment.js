@@ -16,13 +16,15 @@
   'use strict';
 
   /* ─── CONFIG ────────────────────────────────────────────────── */
-  const CF_ENV     = 'production';
-  const ORDER_URL  = typeof CASHFREE_ORDER_URL  !== 'undefined'
-    ? CASHFREE_ORDER_URL  : 'https://createcashfreeorder-419137308157.us-central1.run.app';
-  const VERIFY_URL = typeof VERIFY_PAYMENT_URL  !== 'undefined'
-    ? VERIFY_PAYMENT_URL  : 'https://verifypayment-419137308157.us-central1.run.app';
-  const CF_APP_ID  = typeof CASHFREE_APP_ID !== 'undefined'
-    ? CASHFREE_APP_ID : 'AppID12313568ac3cf01b86d06d981446531321';
+  // Switch to 'sandbox' for testing, 'production' for real payments
+  const CF_ENV = 'production';
+
+  // Auto-detect: if served from Firebase Hosting use relative /api/ paths.
+  // If served from GitHub Pages or any other domain use the new Cloud Run URLs
+  // (these were just deployed and have origin:true CORS — allow all domains).
+  const _onFirebase = location.hostname.includes('web.app') || location.hostname.includes('firebaseapp.com');
+  const ORDER_URL  = _onFirebase ? '/api/create-cashfree-order' : 'https://createcashfreeorder-56khnynjia-uc.a.run.app';
+  const VERIFY_URL = _onFirebase ? '/api/verify-payment'        : 'https://verifypayment-56khnynjia-uc.a.run.app';
 
   const PLANS = {
     ssc:     { id: 'ssc',     name: 'SSC Pro',      price: 199, emoji: '🎯' },
@@ -74,11 +76,10 @@
         customer_id:    uid(),
         customer_name:  userName(),
         customer_email: userEmail(),
-        customer_phone: '9999999999',
+        customer_phone: currentUser()?.phoneNumber?.replace(/\D/g,'').slice(-10) || '9000000000',
         uid:            uid(),
         name:           userName(),
         email:          userEmail(),
-        app_id:         CF_APP_ID,
       }),
     });
 
