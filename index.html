@@ -519,7 +519,7 @@
           <button class="model-option" data-model="teacher" role="option">
             <div class="model-opt-icon">👩‍🏫</div>
             <div class="model-opt-info">
-              <div class="model-opt-name">Teacher Mode <span class="model-tag premium-tag">₹499</span></div>
+              <div class="model-opt-name">Teacher Mode <span class="model-tag free-tag">FREE</span></div>
               <div class="model-opt-desc">Premium voice · Crystal-clear teacher TTS</div>
             </div>
             <div class="model-opt-check"></div>
@@ -557,7 +557,7 @@
               <span class="tps-sub">Tap orb to preview</span>
             </div>
             <!-- Upgrade pill -->
-            <button class="tps-upgrade" onclick="event.stopPropagation();window.showPremiumModal&&window.showPremiumModal()">Upgrade ₹499</button>
+            <button class="tps-upgrade" onclick="event.stopPropagation();document.getElementById('modelDropdown')&&document.getElementById('modelDropdown').classList.remove('open');document.querySelectorAll('.model-option[data-model=teacher]').forEach(function(o){o.click();})">Use Free ✓</button>
           </div>
           
         </div>
@@ -741,7 +741,7 @@
           <span class="upgrade-cta-icon">⭐</span>
           <div>
             <div class="upgrade-cta-title">Upgrade to Premium</div>
-            <div class="upgrade-cta-sub">SSC Pro ₹199 · Class 10/12 ₹99/month</div>
+            <div class="upgrade-cta-sub">SSC Pro ₹199 · Class 10/12 ₹99 · Companions from ₹49/mo</div>
           </div>
         </div>
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"/></svg>
@@ -878,7 +878,7 @@
           <div style="font-size:12px;color:var(--text-secondary);display:flex;align-items:center;gap:6px;"><span style="color:#FF6B9D;">✓</span> All SSC exams + Class 1–12</div>
         </div>
         <button id="upgradeFromSettingsBtn" style="width:100%;padding:12px;background:linear-gradient(135deg,#6C63FF,#FF6B9D);border:none;border-radius:10px;color:white;font-size:13px;font-weight:700;cursor:pointer;letter-spacing:0.03em;box-shadow:0 4px 18px rgba(108,99,255,0.4);transition:opacity 0.2s;" onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-          ⭐ Unlock Premium — from ₹99/month
+          ⭐ Unlock Premium — from ₹49/month
         </button>
       </div>
     </div>
@@ -1381,18 +1381,18 @@
 
       <!-- Premium Companion Personas -->
       <button class="ps-card ps-card-companion" onclick="window.selectPersona('boyfriend')" data-companion-lock="true">
-        <div class="ps-card-badge" style="background:linear-gradient(135deg,#FF6B9D,#ff9a8b);color:#fff;">💕 FREE</div>
+        <div class="ps-card-badge" style="background:linear-gradient(135deg,#FF6B9D,#ff9a8b);color:#fff;">💕 OFFER</div>
         <div class="ps-card-emoji">👦</div>
         <div class="ps-card-name" style="color:#FF6B9D;">Boyfriend</div>
-        <div class="ps-card-desc">Loving, caring, flirty desi boyfriend who supports you through studies & life</div><div style="font-size:10px;color:#7C72FF;font-weight:700;margin-top:4px;">🔒 ₹49 one-time unlock</div>
+        <div class="ps-card-desc">Loving, caring, flirty desi boyfriend who supports you through studies & life</div><div style="font-size:10px;color:#7C72FF;font-weight:700;margin-top:4px;">🔒 ₹49/mo · ₹499/yr · Was ₹1,299</div>
         <div class="ps-card-example">"jaan aaj bahut acchi lag rahi ho 🥺 chal saath padhte hain 📚❤️"</div>
       </button>
 
       <button class="ps-card ps-card-companion" onclick="window.selectPersona('girlfriend')" data-companion-lock="true">
-        <div class="ps-card-badge" style="background:linear-gradient(135deg,#a855f7,#FF6B9D);color:#fff;">💕 FREE</div>
+        <div class="ps-card-badge" style="background:linear-gradient(135deg,#a855f7,#FF6B9D);color:#fff;">💕 OFFER</div>
         <div class="ps-card-emoji">👩</div>
         <div class="ps-card-name" style="color:#FF6B9D;">Girlfriend</div>
-        <div class="ps-card-desc">Sweet, expressive, slightly dramatic desi girlfriend — always there for you</div><div style="font-size:10px;color:#FF6B9D;font-weight:700;margin-top:4px;">🔒 ₹49 one-time unlock</div>
+        <div class="ps-card-desc">Sweet, expressive, slightly dramatic desi girlfriend — always there for you</div><div style="font-size:10px;color:#FF6B9D;font-weight:700;margin-top:4px;">🔒 ₹49/mo · ₹499/yr · Was ₹1,299</div>
         <div class="ps-card-example">"kaha the itni der? miss kar rahi thi toh 🥺 baat karo na mujhse 💕"</div>
       </button>
 
