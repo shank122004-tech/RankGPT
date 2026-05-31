@@ -23,8 +23,8 @@ const VOICE_PLAN_NAME  = 'AI Teacher Pro';
 const GOOGLE_TTS_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
 // ★ PUT YOUR GOOGLE TTS API KEY HERE ★
 // Get one at: https://console.cloud.google.com → Cloud Text-to-Speech API
-const GOOGLE_TTS_KEY = 'AQ.Ab8RN6LKhs4ra7PVk_R74RLyPoEkNzk853w3vYJlHiz69TqPXg';
-window.GOOGLE_TTS_KEY = GOOGLE_TTS_KEY; // expose for app.js speakMessage button
+const GOOGLE_TTS_KEY = 'AIzaSyAQS9O79n5AzF-EnQEguEcf--igvjtv2H0';
+window.GOOGLE_TTS_KEY = 'AIzaSyAQS9O79n5AzF-EnQEguEcf--igvjtv2H0'; // expose for app.js speakMessage button
 const PREMIUM_VOICE_NAME = 'Leda';
 const RECOG_LANGS = [
   { code: 'hi-IN',  label: 'हिंदी' },
@@ -939,18 +939,34 @@ async function _speakGoogleTTS(text) {
     return _speakBrowserTTS(text);
   }
   try {
-    const langCode = (voiceState.recognitionLang || 'en-IN').startsWith('hi') ? 'hi-IN' : 'en-IN';
+    const isHindi = (voiceState.recognitionLang || 'en-IN').startsWith('hi');
+
+    // Leda is a Google Journey voice — it ONLY works with languageCode "en-US"
+    // Journey voices must NOT have ssmlGender set (causes API rejection)
+    // For Hindi, fall back to Wavenet-D (Leda doesn't support hi-IN)
+    let voiceConfig;
+    if (isHindi) {
+      voiceConfig = {
+        languageCode: 'hi-IN',
+        name: 'hi-IN-Wavenet-D',
+        ssmlGender: 'FEMALE'
+      };
+    } else {
+      // Leda — Journey voice, en-US only, no ssmlGender
+      voiceConfig = {
+        languageCode: 'en-US',
+        name: 'en-US-Journey-F'   // "Leda" is the display name for en-US-Journey-F
+      };
+    }
+
     const body = {
       input: { text },
-      voice: {
-        languageCode: langCode,
-        name: langCode === 'hi-IN' ? 'hi-IN-Wavenet-D' : 'en-IN-Wavenet-D',
-        ssmlGender: 'FEMALE'
-      },
+      voice: voiceConfig,
       audioConfig: {
         audioEncoding: 'MP3',
         speakingRate: voiceState.speechRate || 1.0,
-        pitch: ((voiceState.speechPitch || 1.0) - 1) * 10
+        // Journey voices ignore pitch — only set for Wavenet
+        ...(isHindi ? { pitch: ((voiceState.speechPitch || 1.0) - 1) * 10 } : {})
       }
     };
     const res = await fetch(`${GOOGLE_TTS_ENDPOINT}?key=${key}`, {
@@ -1310,7 +1326,12 @@ function _addVoiceSettings() {
     const testText = voiceState.recognitionLang?.startsWith('hi')
       ? 'नमस्ते! CrackAI आपका AI टीचर है। आवाज़ की सेटिंग सही है।'
       : 'Hello! CrackAI is your AI Teacher. Voice settings are working correctly.';
-    await _speakBrowserTTS(testText);
+    // Use Google TTS (Leda) for teacher mode test, browser TTS otherwise
+    if (voiceState.model === 'teacher') {
+      await _speakGoogleTTS(testText);
+    } else {
+      await _speakBrowserTTS(testText);
+    }
     btn.textContent = '🔊 Test Voice Settings';
     btn.disabled = false;
   });
@@ -1429,53 +1450,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
 });
 async function playPremiumVoice(text){
-
-  try{
-
-    const response = await fetch(
-      'https://texttospeech.googleapis.com/v1/text:synthesize?key=YOUR_GEMINI_API_KEY',
-      {
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json'
-        },
-        body:JSON.stringify({
-
-          input:{
-            text:text
-          },
-
-          voice:{
-            languageCode:'en-IN',
-            name:'Leda'
-          },
-
-          audioConfig:{
-            audioEncoding:'MP3'
-          }
-
-        })
-      }
-    );
-
-    const data = await response.json();
-
-    if(data.audioContent){
-
-      const audio = new Audio(
-        'data:audio/mp3;base64,' + data.audioContent
-      );
-
-      audio.play();
-
-    }
-
-  }catch(err){
-
-    console.error(err);
-
+  // Delegates to the main _speakGoogleTTS which uses en-US-Journey-F (Leda)
+  if (typeof _speakGoogleTTS === 'function') {
+    await _speakGoogleTTS(text);
   }
-
 }
 // DEMO VOICE PLAYER
 window.addEventListener('DOMContentLoaded', () => {
