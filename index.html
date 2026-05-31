@@ -782,7 +782,7 @@
           <div class="settings-item-label">Talk Style</div>
           <div class="settings-item-desc">Choose how AI talks to you</div>
         </div>
-        <select id="personaSettingsSelect" class="settings-select" style="min-width:130px;" onchange="window.selectPersona(this.value)">
+        <select id="personaSettingsSelect" class="settings-select" style="min-width:130px;" onchange="window.handlePersonaSettingsChange(this)">
           <option value="">🤖 Default AI</option>
           <option value="bhaiya">👦 Bhaiya (Elder Bro)</option>
           <option value="didi">👩 Didi (Elder Sis)</option>
@@ -792,8 +792,8 @@
           <option value="mentor">🧘 Mentor</option>
           <option value="motivator">⚡ Motivator</option>
           <option value="coach">🏋️ Coach</option>
-          <option value="boyfriend">💕 Boyfriend</option>
-          <option value="girlfriend">💕 Girlfriend</option>
+          <option value="boyfriend">💕 Boyfriend 🔒</option>
+          <option value="girlfriend">💕 Girlfriend 🔒</option>
         </select>
       </div>
       <div id="personaSettingsDesc" style="margin:4px 8px 0 44px;font-size:11px;color:rgba(200,195,255,0.5);min-height:16px;"></div>
@@ -1352,7 +1352,7 @@
       </button>
 
       <!-- Premium Companion Personas -->
-      <button class="ps-card ps-card-companion" onclick="selectPersona('boyfriend')">
+      <button class="ps-card ps-card-companion" onclick="window.selectPersona('boyfriend')" data-companion-lock="true">
         <div class="ps-card-badge" style="background:linear-gradient(135deg,#FF6B9D,#ff9a8b);color:#fff;">💕 FREE</div>
         <div class="ps-card-emoji">👦</div>
         <div class="ps-card-name" style="color:#FF6B9D;">Boyfriend</div>
@@ -1360,7 +1360,7 @@
         <div class="ps-card-example">"jaan aaj bahut acchi lag rahi ho 🥺 chal saath padhte hain 📚❤️"</div>
       </button>
 
-      <button class="ps-card ps-card-companion" onclick="selectPersona('girlfriend')">
+      <button class="ps-card ps-card-companion" onclick="window.selectPersona('girlfriend')" data-companion-lock="true">
         <div class="ps-card-badge" style="background:linear-gradient(135deg,#a855f7,#FF6B9D);color:#fff;">💕 FREE</div>
         <div class="ps-card-emoji">👩</div>
         <div class="ps-card-name" style="color:#FF6B9D;">Girlfriend</div>
@@ -1433,6 +1433,5 @@
 })();
 </script>
 <script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
-<script src="payment.js"></script>
 </body>
 </html>
