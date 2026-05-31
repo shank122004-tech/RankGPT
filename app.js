@@ -45,8 +45,8 @@ const TEACHER_AD_REWARD_KEY = 'crackwith_teacher_ad_reward';
 const TEACHER_AD_REWARD_DURATION_MS = 30 * 60 * 1000; // 30 minutes
 const TEACHER_AD_MAX_QUESTIONS = 15;
 const TEACHER_ADS_REQUIRED = 5; // must watch 5 ads
-const CASHFREE_ORDER_URL = 'https://createcashfreeorder-419137308157.us-central1.run.app';
-const VERIFY_PAYMENT_URL = 'https://verifypayment-419137308157.us-central1.run.app';
+const CASHFREE_ORDER_URL = 'https://createcashfreeorder-56khnynjia-uc.a.run.app';
+const VERIFY_PAYMENT_URL = 'https://verifypayment-56khnynjia-uc.a.run.app';
 // Cashfree credentials
 const CASHFREE_APP_ID = 'AppID12313568ac3cf01b86d06d981446531321';
 const CASHFREE_SECRET_KEY = 'cfsk_ma_prod_865eae796bd15e735eb003b2a00e2e96_23d175a3';
@@ -2691,6 +2691,7 @@ function initVoiceDemos() {
 function _rewirePvsPlayer() {
   _makeDemoPlayer('premiumDemoAudio2','pvsPlayBtn','pvsPlayIcon','pvsPauseIcon','pvsOrbWrap','pvsWave');
 }
+window._rewirePvsPlayer = _rewirePvsPlayer;
 
 // Patch openPremiumModal to re-wire the voice player after innerHTML is rebuilt
 var _origOpenPremiumModal = openPremiumModal;
