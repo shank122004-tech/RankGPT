@@ -53,6 +53,19 @@
     window.__firebaseReady = true; // flag so initApp can detect it fired early
     window.dispatchEvent(new Event('firebaseReady'));
   </script>
+  <script>
+    // Fallback stub — payment.js overrides this once loaded
+    window.handlePersonaSettingsChange = window.handlePersonaSettingsChange || function(sel) {
+      var v = sel.value;
+      if ((v === 'boyfriend' || v === 'girlfriend') && typeof window.openCompanionGateModal === 'function') {
+        var prev = (typeof state !== 'undefined' ? state.aiPersona : null) || '';
+        sel.value = prev;
+        window.openCompanionGateModal(v);
+      } else if (typeof window.selectPersona === 'function') {
+        window.selectPersona(v);
+      }
+    };
+  </script>
 </head>
 <body>
 
