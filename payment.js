@@ -587,6 +587,7 @@
 
   // Expose revertModelSelector globally for inline onclick handlers
   window.revertModelSelector = revertModelSelector;
+  window.openCompanionGateModal = openCompanionGateModal;
 
   /* ══════════════════════════════════════════════════════════════
      COMPANION PERSONA GATE
