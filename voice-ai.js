@@ -21,6 +21,10 @@ const VOICE_PLAN_ID    = 'teacher';
 const VOICE_PLAN_PRICE = 1;
 const VOICE_PLAN_NAME  = 'AI Teacher Pro';
 const GOOGLE_TTS_ENDPOINT = 'https://texttospeech.googleapis.com/v1/text:synthesize';
+// ★ PUT YOUR GOOGLE TTS API KEY HERE ★
+// Get one at: https://console.cloud.google.com → Cloud Text-to-Speech API
+const GOOGLE_TTS_KEY = 'YOUR_GOOGLE_TTS_API_KEY';
+window.GOOGLE_TTS_KEY = GOOGLE_TTS_KEY; // expose for app.js speakMessage button
 const PREMIUM_VOICE_NAME = 'Leda';
 const RECOG_LANGS = [
   { code: 'hi-IN',  label: 'हिंदी' },
@@ -925,36 +929,69 @@ async function _speakBrowserTTS(text) {
 }
 
 async function _speakGoogleTTS(text) {
+  const key = GOOGLE_TTS_KEY || window.GOOGLE_TTS_KEY;
+  if (!key || key === 'YOUR_GOOGLE_TTS_API_KEY') {
+    // Key not configured — show clear error in teacher mode instead of silent browser TTS
+    if (voiceState.model === 'teacher') {
+      if (typeof showToast === 'function') showToast('⚠️ Google TTS key not set. Add GOOGLE_TTS_KEY in voice-ai.js');
+      console.error('[TeacherMode] GOOGLE_TTS_KEY is not configured in voice-ai.js');
+    }
+    return _speakBrowserTTS(text);
+  }
   try {
+    const langCode = (voiceState.recognitionLang || 'en-IN').startsWith('hi') ? 'hi-IN' : 'en-IN';
     const body = {
       input: { text },
       voice: {
-        languageCode: voiceState.recognitionLang.startsWith('hi') ? 'hi-IN' : 'en-IN',
-        name: voiceState.recognitionLang.startsWith('hi') ? 'hi-IN-Wavenet-D' : 'en-IN-Wavenet-D',
+        languageCode: langCode,
+        name: langCode === 'hi-IN' ? 'hi-IN-Wavenet-D' : 'en-IN-Wavenet-D',
         ssmlGender: 'FEMALE'
       },
-      audioConfig: { audioEncoding: 'MP3', speakingRate: voiceState.speechRate, pitch: (voiceState.speechPitch - 1) * 10 }
+      audioConfig: {
+        audioEncoding: 'MP3',
+        speakingRate: voiceState.speechRate || 1.0,
+        pitch: ((voiceState.speechPitch || 1.0) - 1) * 10
+      }
     };
-    const res = await fetch(`${GOOGLE_TTS_ENDPOINT}?key=${window.GOOGLE_TTS_KEY}`, {
+    const res = await fetch(`${GOOGLE_TTS_ENDPOINT}?key=${key}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
     });
-    if (!res.ok) throw new Error('Google TTS failed');
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      throw new Error(errBody?.error?.message || 'Google TTS HTTP ' + res.status);
+    }
     const data = await res.json();
+    if (!data.audioContent) throw new Error('No audioContent in Google TTS response');
     const audio = new Audio('data:audio/mp3;base64,' + data.audioContent);
     voiceState.isSpeaking = true;
+    voiceState._currentTeacherAudio = audio; // store ref so stopSpeaking can cancel it
     return new Promise((resolve) => {
-      audio.onended = () => { voiceState.isSpeaking = false; resolve(); };
-      audio.onerror = () => { voiceState.isSpeaking = false; resolve(); };
-      audio.play().catch(() => { voiceState.isSpeaking = false; resolve(); });
+      audio.onended = () => { voiceState.isSpeaking = false; voiceState._currentTeacherAudio = null; resolve(); };
+      audio.onerror = (e) => {
+        console.error('[TeacherMode] Audio playback error:', e);
+        voiceState.isSpeaking = false; voiceState._currentTeacherAudio = null; resolve();
+      };
+      audio.play().catch((e) => {
+        console.error('[TeacherMode] Audio play() failed:', e);
+        voiceState.isSpeaking = false; voiceState._currentTeacherAudio = null; resolve();
+      });
     });
   } catch(e) {
-    console.warn('Google TTS fallback:', e);
+    console.error('[TeacherMode] Google TTS error:', e.message);
+    if (typeof showToast === 'function') showToast('❌ Teacher TTS error: ' + e.message);
+    // In teacher mode: DO NOT fall back to browser TTS — show error only
+    if (voiceState.model === 'teacher') return;
     return _speakBrowserTTS(text);
   }
 }
 
 function stopSpeaking() {
   if (window.speechSynthesis) window.speechSynthesis.cancel();
+  // Also stop any active Google TTS audio (teacher mode)
+  if (voiceState._currentTeacherAudio) {
+    try { voiceState._currentTeacherAudio.pause(); voiceState._currentTeacherAudio.currentTime = 0; } catch(e) {}
+    voiceState._currentTeacherAudio = null;
+  }
   voiceState.isSpeaking = false;
   voiceState.currentUtterance = null;
 }
@@ -1300,7 +1337,53 @@ function initVoiceAI() {
   // Restore teacher unlock
   if (_isTeacherPremium()) voiceState.premiumVoice = true;
 
+  // ── Hook sendMessage for Teacher Mode typed input ──────────────
+  // When teacher mode is active and user types (not speaks), intercept
+  // the AI response and speak it via Google TTS automatically.
+  _hookSendMessageForTeacher();
+
   console.log('[VoiceAI v2] Initialized. Default model: smart');
+}
+
+// ─── TEACHER TYPED-INPUT AUTO-SPEAK HOOK ────────────────────
+function _hookSendMessageForTeacher() {
+  // Patch the global sendMessage so teacher mode auto-speaks typed answers
+  const _origSendMessage = window.sendMessage;
+  if (typeof _origSendMessage !== 'function') {
+    // app.js not loaded yet — retry once it's ready
+    setTimeout(_hookSendMessageForTeacher, 500);
+    return;
+  }
+
+  window.sendMessage = async function() {
+    // Not in teacher mode — just run original
+    if (voiceState.model !== 'teacher') {
+      return _origSendMessage.apply(this, arguments);
+    }
+
+    // Teacher mode: run original then speak the response via Google TTS
+    const messagesBefore = document.querySelectorAll('.message.ai-message').length;
+    await _origSendMessage.apply(this, arguments);
+
+    // Find the new AI message bubble that was just added
+    const allAiBubbles = document.querySelectorAll('.message.ai-message .message-bubble');
+    if (!allAiBubbles.length) return;
+    const lastBubble = allAiBubbles[allAiBubbles.length - 1];
+    const rawText = lastBubble?.innerText || '';
+    if (!rawText.trim()) return;
+
+    // Strip markdown for clean speech
+    const clean = _stripMarkdown(rawText);
+    if (!clean) return;
+
+    // Show speaking indicator in UI
+    if (typeof showToast === 'function') showToast('👩‍🏫 Teacher is speaking…', 2000);
+
+    // Speak via Google TTS (never browser TTS for teacher mode)
+    voiceState.isSpeaking = true;
+    await _speakGoogleTTS(clean);
+    voiceState.isSpeaking = false;
+  };
 }
 
 // ─── EXPORTS ─────────────────────────────────────────────────
