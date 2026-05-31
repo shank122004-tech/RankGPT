@@ -611,7 +611,21 @@
     const cfg = COMPANION_ADDONS[persona];
     localStorage.setItem('crackai_addon_' + cfg.planId, JSON.stringify({ active: true, activatedAt: Date.now() }));
     syncFirestore({ ['addon_' + cfg.planId]: true });
-    // Now actually select the persona via original function
+
+    // Remove 🔒 from the settings dropdown option
+    const sel = document.getElementById('personaSettingsSelect');
+    if (sel) {
+      const opt = sel.querySelector(`option[value="${persona}"]`);
+      if (opt) opt.textContent = opt.textContent.replace(' 🔒', '');
+    }
+
+    // Remove lock badge from persona card
+    document.querySelectorAll(`[data-companion-lock="true"]`).forEach(card => {
+      const badge = card.querySelector('.companion-lock-badge');
+      if (badge) badge.remove();
+    });
+
+    // Now select the persona via original function
     if (typeof _origSelectPersona === 'function') _origSelectPersona(persona);
     toast(`🎉 ${cfg.name} unlocked! Enjoy your companion 💕`, 3500);
     if (typeof _doConfetti === 'function') _doConfetti();
@@ -679,21 +693,36 @@
     });
   };
 
-  // Override selectPersona globally to intercept BF/GF before app.js handles it
-  const _origSelectPersona = window.selectPersona;
-  window.selectPersona = function(persona) {
-    if ((persona === 'boyfriend' || persona === 'girlfriend')) {
+  // ── handlePersonaSettingsChange — called by settings <select> ──
+  // Reverts dropdown cleanly without triggering selectPersona('') side-effects
+  window.handlePersonaSettingsChange = function(selectEl) {
+    const persona   = selectEl.value;
+    const prevValue = (typeof state !== 'undefined' ? state.aiPersona : null) || '';
+
+    if (persona === 'boyfriend' || persona === 'girlfriend') {
       if (!isCompanionUnlocked(persona)) {
-        // Close persona selector modal first
-        if (typeof closePersonaSelector === 'function') closePersonaSelector();
-        // Also revert settings dropdown if it was changed
-        const sel = document.getElementById('personaSettingsSelect');
-        if (sel && sel.value === persona) sel.value = window._state?.aiPersona || '';
+        // Revert dropdown to previous value immediately — before any modal opens
+        selectEl.value = prevValue;
         openCompanionGateModal(persona);
-        return; // block original
+        return;
       }
     }
-    // Free persona or already unlocked — pass through
+    // Free or already unlocked — call original
+    if (typeof _origSelectPersona === 'function') _origSelectPersona(persona);
+    else if (typeof window.selectPersona === 'function') window.selectPersona(persona);
+  };
+
+  // ── Intercept selectPersona globally (for persona modal card clicks) ──
+  const _origSelectPersona = window.selectPersona;
+  window.selectPersona = function(persona) {
+    if (persona === 'boyfriend' || persona === 'girlfriend') {
+      if (!isCompanionUnlocked(persona)) {
+        if (typeof closePersonaSelector === 'function') closePersonaSelector();
+        openCompanionGateModal(persona);
+        return; // block — do NOT call original
+      }
+    }
+    // Free or unlocked — pass through to app.js original
     if (typeof _origSelectPersona === 'function') _origSelectPersona(persona);
   };
 
@@ -703,6 +732,61 @@
   } else {
     setTimeout(checkPendingOnLoad, 1500);
   }
+
+  // ── Add lock badges to BF/GF persona cards on load ─────────────
+  function refreshCompanionLockUI() {
+    const bfUnlocked = isCompanionUnlocked('boyfriend');
+    const gfUnlocked = isCompanionUnlocked('girlfriend');
+
+    // Persona modal cards
+    document.querySelectorAll('[data-companion-lock="true"]').forEach(card => {
+      const isBF = card.onclick?.toString().includes('boyfriend') ||
+                   card.getAttribute('onclick')?.includes('boyfriend');
+      const unlocked = isBF ? bfUnlocked : gfUnlocked;
+
+      // Remove existing badge first
+      card.querySelector('.companion-lock-badge')?.remove();
+
+      if (!unlocked) {
+        const badge = document.createElement('span');
+        badge.className = 'companion-lock-badge';
+        badge.textContent = '🔒 ₹49';
+        badge.style.cssText = `
+          position:absolute; top:8px; right:8px;
+          font-size:10px; font-weight:700;
+          background:rgba(255,107,157,0.2);
+          border:1px solid rgba(255,107,157,0.4);
+          color:#FF6B9D; padding:2px 7px;
+          border-radius:20px; pointer-events:none;
+        `;
+        card.style.position = 'relative';
+        card.appendChild(badge);
+      }
+    });
+
+    // Settings dropdown options — update lock text
+    const sel = document.getElementById('personaSettingsSelect');
+    if (sel) {
+      const bfOpt = sel.querySelector('option[value="boyfriend"]');
+      const gfOpt = sel.querySelector('option[value="girlfriend"]');
+      if (bfOpt) bfOpt.textContent = bfUnlocked ? '💕 Boyfriend' : '💕 Boyfriend 🔒';
+      if (gfOpt) gfOpt.textContent = gfUnlocked ? '💕 Girlfriend' : '💕 Girlfriend 🔒';
+    }
+  }
+
+  // Run on load + whenever persona modal opens
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => setTimeout(refreshCompanionLockUI, 800));
+  } else {
+    setTimeout(refreshCompanionLockUI, 800);
+  }
+
+  // Patch showPersonaSelector to refresh badges each time modal opens
+  const _origShowPersonaSelector = window.showPersonaSelector;
+  window.showPersonaSelector = function() {
+    if (typeof _origShowPersonaSelector === 'function') _origShowPersonaSelector();
+    setTimeout(refreshCompanionLockUI, 50);
+  };
 
   console.log('[payment.js] v2.1 loaded — using Cloud Run backend for order creation');
 
