@@ -424,6 +424,43 @@
         <div class="pf-feat"><span>✅</span><span>30-day money-back guarantee</span></div>
       </div>
 
+      <!-- ── AI Companion Monthly Add-ons ── -->
+      <div class="pf-section-divider"><span>💕 AI Companions</span></div>
+      <p class="pf-companion-sub">Your personal desi study partner — romantic Hinglish, emotional support & study together · ₹49/month each</p>
+      <div class="pf-companion-cards">
+        ${(['boyfriend','girlfriend']).map(persona => {
+          const isBF     = persona === 'boyfriend';
+          const planId   = isBF ? 'companion_bf_addon' : 'companion_gf_addon';
+          const stored   = (() => { try { return JSON.parse(localStorage.getItem('crackai_addon_' + planId) || 'null'); } catch { return null; } })();
+          const unlocked = stored?.active === true && stored?.expiresAt && Date.now() < stored.expiresAt;
+          const expiryStr = unlocked ? new Date(stored.expiresAt).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'}) : '';
+          return `
+          <div class="pf-companion-card ${isBF ? 'pf-companion-bf' : 'pf-companion-gf'}">
+            <div class="pf-companion-emoji">${isBF ? '👦' : '👩'}</div>
+            <div class="pf-companion-name">${isBF ? 'AI Boyfriend' : 'AI Girlfriend'}</div>
+            <div class="pf-companion-desc">${isBF
+              ? 'Caring, loving desi boyfriend — warm Hinglish, sweet support 💙'
+              : 'Sweet, expressive desi girlfriend — always there for you 🌸'}</div>
+            <div class="pf-companion-feats">
+              <span>${isBF ? '💙' : '💕'} Romantic Hinglish conversations</span>
+              <span>📚 Study together in character</span>
+              <span>🥺 Emotional support & care</span>
+              <span>🔄 Renews monthly · Cancel anytime</span>
+            </div>
+            <div class="pf-companion-price ${isBF ? 'pf-companion-price-bf' : ''}">
+              ₹49 <span>/month</span>
+            </div>
+            ${unlocked
+              ? `<div class="pf-companion-active-badge">✅ Active until ${expiryStr}</div>
+                 <button class="pf-companion-btn pf-companion-btn-renew" onclick="payCompanion('${persona}', this)">🔄 Renew — ₹49/mo</button>`
+              : `<button class="pf-companion-btn ${isBF ? 'pf-companion-btn-bf' : 'pf-companion-btn-gf'}" onclick="payCompanion('${persona}', this)">
+                   ${isBF ? '💙' : '💕'} Subscribe ${isBF ? 'Boyfriend' : 'Girlfriend'} — ₹49/mo
+                 </button>`
+            }
+          </div>`;
+        }).join('')}
+      </div>
+
       <div class="pf-footer">
         <div class="pf-stats">
           <div class="pf-stat"><span class="pf-stat-num">50K+</span><span class="pf-stat-lbl">Students</span></div>
@@ -475,6 +512,30 @@
       .pf-stat-num{display:block;font-size:16px;font-weight:800;color:#fff}
       .pf-stat-lbl{font-size:10px;color:rgba(200,195,255,.4);text-transform:uppercase;letter-spacing:.06em}
       .pf-stat-sep{width:1px;height:28px;background:rgba(255,255,255,.08)}
+      .pf-section-divider{display:flex;align-items:center;gap:10px;margin:22px 0 8px;font-size:13px;font-weight:700;color:rgba(255,107,157,.9);letter-spacing:.04em}
+      .pf-section-divider::before,.pf-section-divider::after{content:'';flex:1;height:1px;background:rgba(255,107,157,.2)}
+      .pf-companion-sub{font-size:12px;color:rgba(200,180,220,.55);text-align:center;margin:0 0 12px;line-height:1.5}
+      .pf-companion-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px}
+      @media(max-width:420px){.pf-companion-cards{grid-template-columns:1fr}}
+      .pf-companion-card{border-radius:16px;padding:16px 12px;text-align:center;border:1px solid rgba(255,107,157,.25);background:rgba(255,107,157,.05);transition:border-color .2s,transform .15s}
+      .pf-companion-card:hover{border-color:rgba(255,107,157,.5);transform:translateY(-2px)}
+      .pf-companion-bf{border-color:rgba(108,99,255,.3);background:rgba(108,99,255,.06)}
+      .pf-companion-bf:hover{border-color:rgba(108,99,255,.6)}
+      .pf-companion-emoji{font-size:26px;margin-bottom:5px}
+      .pf-companion-name{font-size:14px;font-weight:700;color:#fff;margin-bottom:4px}
+      .pf-companion-desc{font-size:11px;color:rgba(200,180,220,.6);line-height:1.45;margin-bottom:9px}
+      .pf-companion-feats{display:flex;flex-direction:column;gap:3px;margin-bottom:9px;text-align:left}
+      .pf-companion-feats span{font-size:10px;color:rgba(200,180,220,.7)}
+      .pf-companion-price{font-size:22px;font-weight:800;color:#FF6B9D;margin-bottom:10px}
+      .pf-companion-price-bf{color:#7C72FF}
+      .pf-companion-price span{font-size:10px;font-weight:400;color:rgba(200,180,220,.4);margin-left:2px}
+      .pf-companion-active-badge{font-size:10px;color:#10b981;background:rgba(16,185,129,.1);border:1px solid rgba(16,185,129,.3);border-radius:8px;padding:4px 8px;margin-bottom:8px;display:inline-block}
+      .pf-companion-btn{width:100%;padding:9px 4px;border:none;border-radius:10px;color:#fff;font-size:11px;font-weight:700;cursor:pointer;transition:opacity .2s,transform .15s;letter-spacing:.01em;line-height:1.3}
+      .pf-companion-btn:hover:not(:disabled){opacity:.88;transform:scale(1.02)}
+      .pf-companion-btn:disabled{opacity:.6;cursor:default}
+      .pf-companion-btn-gf{background:linear-gradient(135deg,#FF6B9D,#ff9a8b);box-shadow:0 3px 12px rgba(255,107,157,.35)}
+      .pf-companion-btn-bf{background:linear-gradient(135deg,#7C72FF,#6C63FF);box-shadow:0 3px 12px rgba(108,99,255,.35)}
+      .pf-companion-btn-renew{background:linear-gradient(135deg,#10b981,#059669);box-shadow:0 3px 12px rgba(16,185,129,.3)}
     `;
     document.head.appendChild(s);
   }
@@ -593,14 +654,25 @@
   ══════════════════════════════════════════════════════════════ */
 
   const COMPANION_ADDONS = {
-    boyfriend:  { planId: 'companion_bf_addon', name: 'AI Boyfriend',  emoji: '💙', price: 49 },
-    girlfriend: { planId: 'companion_gf_addon', name: 'AI Girlfriend', emoji: '💕', price: 49 },
+    boyfriend:  { planId: 'companion_bf_addon', name: 'AI Boyfriend',  emoji: '💙', price: 49, monthly: true },
+    girlfriend: { planId: 'companion_gf_addon', name: 'AI Girlfriend', emoji: '💕', price: 49, monthly: true },
   };
+
+  // ── Companion expiry helpers ─────────────────────────────────
+  // Monthly = 31 days from activation
+  const COMPANION_EXPIRY_MS = 31 * 24 * 60 * 60 * 1000;
 
   function isCompanionUnlocked(persona) {
     try {
       const d = JSON.parse(localStorage.getItem('crackai_addon_' + COMPANION_ADDONS[persona].planId) || 'null');
-      return d?.active === true;
+      if (!d || d.active !== true) return false;
+      // Monthly — check expiry
+      if (d.expiresAt && Date.now() > d.expiresAt) {
+        // Expired — clear it
+        localStorage.removeItem('crackai_addon_' + COMPANION_ADDONS[persona].planId);
+        return false;
+      }
+      return true;
     } catch { return false; }
   }
 
@@ -614,10 +686,15 @@
   }
 
   function activateCompanion(persona) {
-    const cfg = COMPANION_ADDONS[persona];
-    // Save to localStorage + Firestore
-    localStorage.setItem('crackai_addon_' + cfg.planId, JSON.stringify({ active: true, activatedAt: Date.now() }));
-    syncFirestore({ ['addon_' + cfg.planId]: true });
+    const cfg       = COMPANION_ADDONS[persona];
+    const now       = Date.now();
+    const expiresAt = now + COMPANION_EXPIRY_MS;
+
+    // Save to localStorage with expiry
+    localStorage.setItem('crackai_addon_' + cfg.planId, JSON.stringify({
+      active: true, activatedAt: now, expiresAt, monthly: true
+    }));
+    syncFirestore({ ['addon_' + cfg.planId]: true, ['addon_' + cfg.planId + '_expiry']: expiresAt });
 
     // Close gate modal
     document.getElementById('companionGateModal_' + persona)?.remove();
@@ -665,12 +742,12 @@
           <li>♾️ Lifetime access · One-time unlock</li>
         </ul>
         <div class="cf-addon-price" style="color:${isBF ? '#7C72FF' : '#FF6B9D'}">
-          ₹${cfg.price} <span>one-time · Lifetime</span>
+          ₹${cfg.price} <span>/month · Cancel anytime</span>
         </div>
         <button class="cf-addon-pay-btn"
           style="background:linear-gradient(135deg,${isBF ? '#7C72FF,#6C63FF' : '#FF6B9D,#ff9a8b'});box-shadow:0 4px 20px rgba(${isBF ? '108,99,255' : '255,107,157'},.35)"
           onclick="payCompanion('${persona}', this)">
-          ${cfg.emoji} Unlock ${cfg.name} — ₹${cfg.price}
+          ${cfg.emoji} Subscribe ${cfg.name} — ₹${cfg.price}/mo
         </button>
         <button class="cf-addon-skip" onclick="document.getElementById('${id}').remove()">Maybe Later</button>
         <div class="cf-addon-secure">🔒 One-time payment · Secured by Cashfree</div>
