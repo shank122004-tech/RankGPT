@@ -816,8 +816,8 @@
           <option value="mentor">🧘 Mentor</option>
           <option value="motivator">⚡ Motivator</option>
           <option value="coach">🏋️ Coach</option>
-          <option value="boyfriend">💕 Boyfriend 🔒 ₹49</option>
-          <option value="girlfriend">💕 Girlfriend 🔒 ₹49</option>
+          <option value="boyfriend" disabled>💕 Boyfriend — See Premium ↓</option>
+          <option value="girlfriend" disabled>💕 Girlfriend — See Premium ↓</option>
         </select>
       </div>
       <div id="personaSettingsDesc" style="margin:4px 8px 0 44px;font-size:11px;color:rgba(200,195,255,0.5);min-height:16px;"></div>
@@ -1204,6 +1204,9 @@
 <!-- ★ INTRO SCRIPT ★ -->
 <script src="intro.js"></script>
 <script src="app.js"></script>
+<!-- ★ CASHFREE SDK — must load before payment.js ★ -->
+<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
+<!-- ★ PAYMENT + COMPANION GATE ★ -->
 <script src="payment.js"></script>
 <script src="voice-ai.js" defer></script>
 
@@ -1399,8 +1402,6 @@
   </div>
 </div>
 
-<!-- ★ CASHFREE SDK v3 ★ -->
-<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
 <script>
 (function(){
   var btn = document.getElementById('headerLogoBtn');
@@ -1457,6 +1458,5 @@
   document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeDropdown(); });
 })();
 </script>
-<script src="https://sdk.cashfree.com/js/v3/cashfree.js"></script>
 </body>
 </html>
