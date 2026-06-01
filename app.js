@@ -2509,12 +2509,12 @@ function renderPremiumModal() {
     <div style="text-align:center;padding:8px 0 12px;">
       <div style="font-size:36px;margin-bottom:6px;">🚀</div>
       <h2 style="font-size:19px;font-weight:800;background:linear-gradient(135deg,#6C63FF,#FF6B9D);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:0 0 4px;">Upgrade to CrackAI Premium</h2>
-      <p style="font-size:12px;color:rgba(200,195,255,0.65);margin:0;">SSC + Class 10/12 • Mock Tests • PYQ Bank • Classes</p>
+      <p style="font-size:12px;color:rgba(200,195,255,0.65);margin:0;">Unlock every tool. Beat every exam.</p>
     </div>
 
     <div style="background:linear-gradient(135deg,rgba(255,107,157,0.12),rgba(255,179,71,0.12));border:1px solid rgba(255,107,157,0.35);border-radius:10px;padding:10px 14px;margin-bottom:12px;text-align:center;">
       <div style="font-size:13px;font-weight:700;color:#FF6B9D;">⚡ Free users miss 80% of exam content!</div>
-      <div style="font-size:11px;color:rgba(255,200,150,0.75);margin-top:3px;">Premium students score 2× higher on SSC mocks.</div>
+      <div style="font-size:11px;color:rgba(255,200,150,0.75);margin-top:3px;">Premium students score 2× higher on SSC mocks — every single month.</div>
     </div>
 
     <div style="display:flex;flex-direction:column;gap:12px;">
@@ -2532,17 +2532,22 @@ function renderPremiumModal() {
             <div style="font-size:22px;font-weight:800;color:#fff;">₹199<span style="font-size:12px;font-weight:400;color:rgba(200,195,255,0.5);">/mo</span></div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px;font-size:11px;color:rgba(200,195,255,0.75);">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px;font-size:11px;color:rgba(200,195,255,0.80);">
           <div>✅ Unlimited AI queries</div>
           <div>✅ All 5 SSC exam modes</div>
-          <div>🧪 <b>Mock Tests</b> with analysis</div>
+          <div>🧪 <b>Full Mock Tests</b> + analysis</div>
           <div>📚 <b>PYQ Bank</b> 10,000+ Qs</div>
-          <div>🎓 <b>Video Classes</b></div>
-          <div>📊 Performance analytics</div>
+          <div>📊 <b>Performance Analytics</b></div>
+          <div>🏆 <b>AI Rank Predictor</b></div>
           <div>✅ Image & PDF solving</div>
           <div>🌐 All Indian languages</div>
+          <div>🎤 <b>AI Teacher Voice Mode</b></div>
+          <div>📈 <b>Weak Topic Tracker</b></div>
         </div>
-        <div style="font-size:11px;color:rgba(255,179,71,0.9);text-align:center;margin-bottom:8px;font-weight:600;">⚠️ Free users have NO mock tests or PYQ access</div>
+        <div style="background:rgba(108,99,255,0.13);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:rgba(220,215,255,0.85);">
+          💡 <b>Why toppers choose SSC Pro:</b> Daily Mock Tests with AI explanations, auto-detected weak topics, and a Rank Predictor that tells you exactly where you stand before the real exam.
+        </div>
+        <div style="font-size:11px;color:rgba(255,179,71,0.9);text-align:center;margin-bottom:8px;font-weight:600;">⚠️ Free users have NO mock tests, NO PYQ access, NO analytics</div>
         <button onclick="handlePayment('ssc')" style="width:100%;padding:13px;background:linear-gradient(135deg,#6C63FF,#FF6B9D);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(108,99,255,0.4);">
           ${isPrem && curPlan==='ssc' ? '✅ Active Plan' : '💳 Start SSC Pro — ₹199/month'}
         </button>
@@ -2562,17 +2567,19 @@ function renderPremiumModal() {
             <div style="font-size:10px;color:rgba(200,195,255,0.4);text-decoration:line-through;">₹2,388/yr</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px;font-size:11px;color:rgba(200,195,255,0.75);">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px;font-size:11px;color:rgba(200,195,255,0.80);">
           <div>✅ Everything in SSC Pro</div>
           <div>✅ All Classes 1–12 CBSE</div>
           <div>🧪 Unlimited Mock Tests</div>
           <div>📚 Full PYQ Bank</div>
-          <div>🎓 Live + Recorded Classes</div>
           <div>📊 AI Rank Predictor</div>
-          <div>💎 Only ₹83/month</div>
-          <div>⚡ Priority AI + Support</div>
+          <div>🎤 AI Teacher Voice Mode</div>
+          <div>💎 Only ₹83/month effective</div>
+          <div>⚡ Priority AI responses</div>
+          <div>📈 Advanced Analytics</div>
+          <div>🏅 Streak & XP rewards</div>
         </div>
-        <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:7px;margin-bottom:10px;text-align:center;font-size:12px;color:#f59e0b;font-weight:700;">₹999/year = just ₹83/month (vs ₹199×12)</div>
+        <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:7px;margin-bottom:10px;text-align:center;font-size:12px;color:#f59e0b;font-weight:700;">₹999/year = just ₹83/month — 58% cheaper than monthly!</div>
         <button onclick="handlePayment('yearly')" style="width:100%;padding:13px;background:linear-gradient(135deg,#f59e0b,#FF6B9D);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(245,158,11,0.4);">
           ${isPrem && curPlan==='yearly' ? '✅ Active Plan' : '🌟 Get All-in-One Pro — ₹999/year'}
         </button>
@@ -2584,21 +2591,26 @@ function renderPremiumModal() {
           <span style="font-size:24px;">📖</span>
           <div>
             <div style="font-weight:800;font-size:15px;color:#fff;">Class Pro</div>
-            <div style="font-size:11px;color:rgba(200,195,255,0.6);">Class 9–10 & 11–12 CBSE</div>
+            <div style="font-size:11px;color:rgba(200,195,255,0.6);">Class 9–10 & 11–12 CBSE/NCERT</div>
           </div>
           <div style="margin-left:auto;">
             <div style="font-size:22px;font-weight:800;color:#fff;">₹199<span style="font-size:12px;font-weight:400;color:rgba(200,195,255,0.5);">/mo</span></div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px;font-size:11px;color:rgba(200,195,255,0.75);">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px;font-size:11px;color:rgba(200,195,255,0.80);">
           <div>✅ All subjects Class 9–12</div>
           <div>🧪 Chapter-wise Mock Tests</div>
           <div>📚 Board PYQ 10 years</div>
-          <div>🎓 NCERT Video Lectures</div>
-          <div>✅ JEE/NEET concept base</div>
           <div>📊 Board score predictor</div>
+          <div>✅ JEE/NEET concept base</div>
+          <div>🎤 AI Teacher explanations</div>
+          <div>📈 Subject-wise analytics</div>
+          <div>🔁 Daily practice goals</div>
         </div>
-        <div style="font-size:11px;color:rgba(255,179,71,0.9);text-align:center;margin-bottom:8px;font-weight:600;">🎯 Toppers do mock tests 3× per week — will you?</div>
+        <div style="background:rgba(108,99,255,0.10);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:rgba(220,215,255,0.85);">
+          💡 <b>Board exam secret:</b> Students who attempt chapter-wise mocks 3× per week score 25–30 marks higher in boards. Class Pro makes that effortless.
+        </div>
+        <div style="font-size:11px;color:rgba(255,179,71,0.9);text-align:center;margin-bottom:8px;font-weight:600;">🎯 Toppers practice mock tests 3× per week — will you?</div>
         <button onclick="handlePayment('class10')" style="width:100%;padding:13px;background:linear-gradient(135deg,#6C63FF,#8B5CF6);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(108,99,255,0.3);">
           ${isPrem && (curPlan==='class10'||curPlan==='class12') ? '✅ Active Plan' : '💳 Start Class Pro — ₹199/month'}
         </button>
@@ -2610,8 +2622,8 @@ function renderPremiumModal() {
       <div style="font-size:12px;font-weight:700;color:#ff6b6b;margin-bottom:7px;">🚫 Free users miss out on:</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;color:rgba(200,195,255,0.55);">
         <div>❌ Mock Tests & analysis</div><div>❌ PYQ Bank (10,000+ Qs)</div>
-        <div>❌ Video Classes</div><div>❌ AI Rank Predictor</div>
-        <div>❌ Unlimited queries</div><div>❌ Chapter-wise tests</div>
+        <div>❌ AI Rank Predictor</div><div>❌ Performance Analytics</div>
+        <div>❌ Unlimited AI queries</div><div>❌ AI Teacher Voice Mode</div>
       </div>
       <div style="font-size:11px;color:rgba(255,200,150,0.85);margin-top:8px;font-weight:600;text-align:center;">💡 Start today — ₹199/month. Cancel anytime.</div>
     </div>
