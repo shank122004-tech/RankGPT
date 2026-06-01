@@ -34,7 +34,12 @@
     return true;
   }
 
-  function confetti() { if (typeof _doConfetti === 'function') _doConfetti(); }
+  function isRefToolsUnlocked() {
+    try { return lsGet('ref_tools_unlocked', 'false') === true || lsGet('ref_tools_unlocked', 'false') === 'true'; } catch { return false; }
+  }
+  function canUsePYQMock() { return isPrem() || isRefToolsUnlocked(); }
+
+
 
   /* Generic full-screen modal factory */
   function createModal(id, title, contentHTML, opts = {}) {
@@ -299,8 +304,9 @@
       const n = (lsGet('ref_count','0')||0) + 1;
       lsSet('ref_count', n);
       if (n >= this.REFS_NEEDED) {
-        lsSet('ref_premium_days', (lsGet('ref_premium_days','0')||0) + this.REWARD_DAYS);
-        toast('🎉 3 referrals complete! +7 days free premium unlocked!', 4000);
+        // Grant limited referral unlock: only PYQ Bank + Mock Test (NOT full premium)
+        lsSet('ref_tools_unlocked', true);
+        toast('🎉 3 referrals complete! PYQ Bank & Mock Test unlocked for free! 🏆', 4000);
         confetti();
       } else {
         toast('👥 Referral registered! ' + n + '/' + this.REFS_NEEDED + ' done.', 3000);
@@ -310,24 +316,43 @@
       return 'Join CrackAI — India\'s smartest SSC prep app! Use code ' + this.getCode() + ' for bonus access 🚀\nhttps://easyfreepdf.online/?ref=' + this.getCode();
     },
     getShareUrl() {
-      return 'https://https://easyfreepdf.online//?ref=' + this.getCode();
+      return 'https://easyfreepdf.online/?ref=' + this.getCode();
     },
     inviteViaWhatsApp() {
       const text = encodeURIComponent(this.getShareText());
       window.open('https://wa.me/?text=' + text, '_blank');
     },
     copyInviteLink() {
+      const url = this.getShareUrl();
       const text = this.getShareText();
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(() => toast('📋 Invite link copied!'));
-      } else {
-        const ta = document.createElement('textarea');
-        ta.value = text;
-        document.body.appendChild(ta);
-        ta.select();
-        document.execCommand('copy');
-        ta.remove();
-        toast('📋 Invite link copied!');
+      const toCopy = url; // copy just the clean URL
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(toCopy)
+            .then(() => toast('📋 Invite link copied!'))
+            .catch(() => {
+              // fallback if clipboard permission denied
+              const ta = document.createElement('textarea');
+              ta.value = toCopy;
+              ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+              document.body.appendChild(ta);
+              ta.focus(); ta.select();
+              document.execCommand('copy');
+              ta.remove();
+              toast('📋 Invite link copied!');
+            });
+        } else {
+          const ta = document.createElement('textarea');
+          ta.value = toCopy;
+          ta.style.cssText = 'position:fixed;opacity:0;top:0;left:0';
+          document.body.appendChild(ta);
+          ta.focus(); ta.select();
+          document.execCommand('copy');
+          ta.remove();
+          toast('📋 Invite link copied!');
+        }
+      } catch (e) {
+        toast('⚠️ Could not copy — please copy manually: ' + toCopy, 4000);
       }
     }
   };
@@ -377,10 +402,21 @@
    * SECTION 9 — STUDY GROUPS (Full Screen)
    * ───────────────────────────────────────────────────────────── */
   const StudyGroups = {
-    _key: 'study_groups',
-    getAll() { return lsGet(this._key, '[]') || []; },
+    // Use a SHARED key (no UID prefix) so groups created by one user
+    // can be found by another user joining via code on the same device/browser.
+    // For cross-device support, the code is shown to the creator so they can
+    // share it; the join lookup searches both shared and user-specific stores.
+    _sharedKey: 'sscai_shared_groups',
+    _getShared() { try { return JSON.parse(localStorage.getItem(this._sharedKey) || '[]') || []; } catch { return []; } },
+    _setShared(v) { try { localStorage.setItem(this._sharedKey, JSON.stringify(v)); } catch {} },
+    getAll() {
+      // Return groups where current user is a member
+      const all = this._getShared();
+      const me = uid();
+      return all.filter(g => g.members.includes(me));
+    },
     create(name, exam) {
-      const groups = this.getAll();
+      const all = this._getShared();
       const group = {
         id: 'grp_' + Date.now(),
         name, exam,
@@ -389,27 +425,28 @@
         messages: [],
         createdAt: Date.now()
       };
-      groups.push(group);
-      lsSet(this._key, groups);
+      all.push(group);
+      this._setShared(all);
       toast('✅ Study group "' + name + '" created! Code: ' + group.code, 4000);
       return group;
     },
     join(code) {
-      const groups = this.getAll();
-      const group = groups.find(g => g.code === code.toUpperCase());
-      if (!group) { toast('❌ Group not found. Check the code.'); return null; }
-      if (!group.members.includes(uid())) group.members.push(uid());
-      lsSet(this._key, groups);
+      const all = this._getShared();
+      const group = all.find(g => g.code === code.toUpperCase());
+      if (!group) { toast('❌ Group not found. Check the code and try again.'); return null; }
+      const me = uid();
+      if (!group.members.includes(me)) group.members.push(me);
+      this._setShared(all);
       toast('✅ Joined group "' + group.name + '"!', 3000);
       return group;
     },
     addMessage(groupId, text) {
-      const groups = this.getAll();
-      const g = groups.find(g => g.id === groupId);
+      const all = this._getShared();
+      const g = all.find(g => g.id === groupId);
       if (!g) return;
       g.messages.push({ uid: uid(), name: (typeof state!=='undefined'?state.user?.displayName:'Student')||'Student', text, ts: Date.now() });
       if (g.messages.length > 200) g.messages.splice(0, g.messages.length - 200);
-      lsSet(this._key, groups);
+      this._setShared(all);
     }
   };
 
@@ -492,14 +529,28 @@
       const others = document.querySelectorAll('.cf-modal.cf-active');
       if (!others.length) document.body.style.overflow = '';
     },
-    openPYQ() { CF.openModal('cf-pyq-modal'); CF._renderPYQHome(); },
-    openMockTest() { CF.openModal('cf-mock-modal'); CF._renderMockTest(); },
-    openAnalytics() { CF.openModal('cf-analytics-modal'); CF._renderAnalytics(); },
-    openStudyGroups() { CF.openModal('cf-groups-modal'); CF._renderGroups(); },
+    openPYQ() {
+      if (!canUsePYQMock()) { toast('🔒 PYQ Bank requires Premium or 3 referrals ₹199/mo'); if (typeof openPremiumModal==='function') openPremiumModal(); return; }
+      CF.openModal('cf-pyq-modal'); CF._renderPYQHome();
+    },
+    openMockTest() {
+      if (!canUsePYQMock()) { toast('🔒 Mock Test requires Premium or 3 referrals ₹199/mo'); if (typeof openPremiumModal==='function') openPremiumModal(); return; }
+      CF.openModal('cf-mock-modal'); CF._renderMockTest();
+    },
+    openAnalytics() {
+      if (needsPremium('Analytics')) return;
+      CF.openModal('cf-analytics-modal'); CF._renderAnalytics();
+    },
+    openStudyGroups() {
+      CF.openModal('cf-groups-modal'); CF._renderGroups();
+    },
     openReferral() { CF.openModal('cf-referral-modal'); CF._renderReferral(); },
     openDailyGoal() { CF.openModal('cf-daily-modal'); CF._renderDailyGoal(); },
-    openScorePredictor() { CF.openModal('cf-score-modal'); CF._renderScorePredictor(); },
-    openExamExpansion() { CF.openModal('cf-exam-modal'); CF._renderExamExpansion(); },
+    openScorePredictor() { /* FREE for all users — no premium gate */ CF.openModal('cf-score-modal'); CF._renderScorePredictor(); },
+    openExamExpansion() {
+      if (needsPremium('Exam & Classes')) return;
+      CF.openModal('cf-exam-modal'); CF._renderExamExpansion();
+    },
 
     toast(msg) { toast(msg); },
 
@@ -946,7 +997,35 @@ Format: [{"q":"question text","opts":["A","B","C","D"],"ans":0,"topic":"${subjec
       const xp = XP.get(), lvl = XP.level();
       const streak = (typeof state!=='undefined'?state.streakDays:0)||0;
       const weak = WeakTopics.getWeakest(3);
+
+      // Determine exam/class label from state.sscMode
+      const sscMode = (typeof state !== 'undefined' && state.sscMode) || 'cgl';
+      const modeConf = EXAM_CONFIGS[sscMode];
+      const modeLabel = modeConf ? modeConf.label : (sscMode.startsWith('class') ? ('Class ' + sscMode.replace('class','')) : sscMode.toUpperCase());
+      const isClass = modeConf && modeConf.type === 'class';
+      const goalLabel = isClass ? (modeLabel + ' Practice') : (modeLabel + ' Prep');
+
+      // Class-specific daily recommended topics
+      const CLASS_TOPICS = {
+        class9:  ['Triangles (Geometry)', 'Laws of Motion (Physics)', 'Democratic Politics', 'The French Revolution', 'Matter in Our Surroundings'],
+        class10: ['Trigonometry', 'Carbon & its Compounds', 'Nationalism in India', 'Electricity (Physics)', 'Real Numbers'],
+        class11: ['Complex Numbers', 'Laws of Thermodynamics', 'Organic Chemistry Basics', 'Indian Constitution', 'Kinematics'],
+        class12: ['Integration (Maths)', 'Electrochemistry', 'Human Reproduction', 'Electromagnetic Induction', 'Probability'],
+      };
+      const SSC_TOPICS = {
+        cgl:  ['Quantitative Aptitude — Percentage', 'English — Reading Comprehension', 'General Awareness — Current Affairs', 'Reasoning — Syllogism'],
+        chsl: ['English — Fill in the Blanks', 'Maths — Speed, Time & Distance', 'GK — History of India', 'Reasoning — Series'],
+        gd:   ['Maths — Number System', 'GK — Indian Polity', 'English — Vocabulary', 'Reasoning — Analogy'],
+        mts:  ['Maths — Simple Interest', 'GK — Geography', 'English — Grammar', 'Reasoning — Coding-Decoding'],
+        cpo:  ['Maths — Profit & Loss', 'GK — Science & Technology', 'English — Error Detection', 'Reasoning — Direction Sense'],
+      };
+      const todayDayIdx = new Date().getDay(); // 0-6
+      const allRec = (isClass ? (CLASS_TOPICS[sscMode] || CLASS_TOPICS['class10']) : (SSC_TOPICS[sscMode] || SSC_TOPICS['cgl']));
+      // Pick 3 topics rotating daily
+      const recommendedTopics = [allRec[todayDayIdx % allRec.length], allRec[(todayDayIdx+1) % allRec.length], allRec[(todayDayIdx+2) % allRec.length]];
+
       body.innerHTML = `
+        <div style="font-size:11px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--primary,#6C63FF);margin-bottom:10px;text-align:center">📚 ${goalLabel}</div>
         <div class="cf-goal-hero">
           <div class="cf-goal-circle" style="--pct:${pct}">
             <div class="cf-goal-inner">
@@ -966,11 +1045,15 @@ Format: [{"q":"question text","opts":["A","B","C","D"],"ans":0,"topic":"${subjec
           </div>`}
         ${weak.length ? `
           <div class="cf-weak-alert" style="margin-top:16px">
-            <div style="font-weight:600;margin-bottom:8px">🎯 Recommended for Today</div>
+            <div style="font-weight:600;margin-bottom:8px">⚠️ Needs Improvement</div>
             ${weak.map(t=>`<div style="margin:4px 0">• <strong>${t.topic}</strong> — ${t.accuracy}% accuracy (${t.attempts} attempts)</div>`).join('')}
           </div>` : ''}
+        <div class="cf-weak-alert" style="margin-top:16px;background:rgba(108,99,255,0.10);border-color:rgba(108,99,255,0.35);">
+          <div style="font-weight:700;margin-bottom:8px;color:var(--primary,#6C63FF)">📅 Recommended for Today — ${modeLabel}</div>
+          ${recommendedTopics.map((t,i)=>`<div style="margin:5px 0;display:flex;align-items:center;gap:6px"><span style="font-size:13px">${['🎯','📖','⚡'][i]}</span> <strong>${t}</strong></div>`).join('')}
+        </div>
         <div style="display:flex;gap:8px;margin-top:20px;flex-wrap:wrap">
-          <button class="cf-btn cf-btn-primary" onclick="CF.closeModal('cf-daily-modal');CF.openPYQ()">📖 Practice PYQs</button>
+          <button class="cf-btn cf-btn-primary" onclick="CF.closeModal('cf-daily-modal');CF.openPYQ()">📖 Practice ${isClass ? 'Questions' : 'PYQs'}</button>
           <button class="cf-btn cf-btn-ghost" onclick="CF.closeModal('cf-daily-modal');CF.openMockTest()">🎯 Take Mock Test</button>
         </div>`;
     },
@@ -1028,7 +1111,7 @@ Format: [{"q":"question text","opts":["A","B","C","D"],"ans":0,"topic":"${subjec
       const refCode = Referral.getCode();
       const refCount = Referral.getReferralCount();
       body.innerHTML = `
-        <p class="cf-muted" style="margin-bottom:12px">Refer 3 friends → Get <strong>7 days free Premium</strong> for both of you!</p>
+        <p class="cf-muted" style="margin-bottom:12px">Refer 3 friends → Unlock <strong>PYQ Bank & Mock Test</strong> free for you both!</p>
         <div class="cf-ref-code">
           <div class="cf-section-label">YOUR CODE</div>
           <div class="cf-ref-code-val">${refCode}</div>
@@ -1296,6 +1379,30 @@ Format: [{"q":"question text","opts":["A","B","C","D"],"ans":0,"topic":"${subjec
       [data-theme="light"] .cf-exam-chip { color:#1a1a2e; }
       [data-theme="light"] .cf-year-btn { color:#1a1a2e; }
       [data-theme="light"] .cf-sidebar-btn { color:rgba(20,20,40,0.75); }
+      /* ── Mobile responsive overrides ── */
+      @media(max-width:480px) {
+        .cf-results-grid { grid-template-columns:repeat(2,1fr) !important; }
+        .cf-stat-row { grid-template-columns:repeat(2,1fr) !important; }
+        .cf-goal-hero { flex-direction:column;align-items:center;gap:12px; }
+        .cf-goal-stats { display:flex;gap:16px;justify-content:center; }
+        .cf-modal-box { border-radius:20px 20px 0 0 !important; }
+        .cf-modal-body { padding:12px 14px !important; }
+        .cf-class-grid { grid-template-columns:repeat(2,1fr) !important; }
+        .cf-group-card { flex-direction:column;align-items:flex-start;gap:8px; }
+        .cf-group-card .cf-btn-sm { align-self:stretch;text-align:center; }
+        .cf-chat-messages { height:200px; }
+        .cf-sidebar-btn { font-size:13px;padding:9px 10px; }
+        .cf-q-text { font-size:13px; }
+        .cf-opt { font-size:12px;padding:9px 12px; }
+        .cf-section-label { font-size:11px; }
+        #cf-drawer-scroll { -webkit-overflow-scrolling:touch; }
+      }
+      @media(max-width:360px) {
+        .cf-results-grid { grid-template-columns:repeat(2,1fr) !important; gap:6px !important; }
+        .cf-result-stat div { font-size:18px !important; }
+        .cf-modal-body { padding:10px 12px !important; }
+        .cf-btn { padding:10px 14px;font-size:12px; }
+      }
     `;
     document.head.appendChild(s);
   }
@@ -1332,14 +1439,13 @@ Format: [{"q":"question text","opts":["A","B","C","D"],"ans":0,"topic":"${subjec
     const drawerList = document.getElementById('historyList');
     if (drawerList && !document.getElementById('cf-sidebar-features')) {
       const items = [
-        { icon:'📚', label:'PYQ Bank',       cb:'CF.openPYQ()' },
-        { icon:'🎯', label:'Mock Test',       cb:'MockTest._state=null;CF.openMockTest()' },
-        { icon:'📖', label:'Exam & Classes',  cb:'CF.openExamExpansion()' },
-        { icon:'📊', label:'Analytics',       cb:'CF.openAnalytics()' },
-        { icon:'🔥', label:'Daily Goal',      cb:'CF.openDailyGoal()' },
-        { icon:'🏆', label:'Rank Predictor',  cb:'CF.openScorePredictor()' },
-        { icon:'👥', label:'Group Study',     cb:'CF.openStudyGroups()' },
-        { icon:'🎁', label:'Refer & Earn',    cb:'CF.openReferral()' },
+        { icon:'📚', label:'PYQ Bank',       cb:'CF.openPYQ()',        premium:true  },
+        { icon:'🎯', label:'Mock Test',       cb:'MockTest._state=null;CF.openMockTest()', premium:true },
+        { icon:'📊', label:'Analytics',       cb:'CF.openAnalytics()', premium:true  },
+        { icon:'🔥', label:'Daily Goal',      cb:'CF.openDailyGoal()', premium:false },
+        { icon:'🏆', label:'Rank Predictor',  cb:'CF.openScorePredictor()', premium:false },
+        { icon:'👥', label:'Group Study',     cb:'CF.openStudyGroups()', premium:false },
+        { icon:'🎁', label:'Refer & Earn',    cb:'CF.openReferral()', premium:false },
       ];
 
       // Build study tools block
@@ -1353,9 +1459,10 @@ Format: [{"q":"question text","opts":["A","B","C","D"],"ans":0,"topic":"${subjec
           <span id="cf-daily-badge">0/${DailyGoal.GOAL}</span>
         </div>
         ${items.map(i=>`
-          <button class="cf-sidebar-btn" onclick="${i.cb};document.getElementById('historyDrawer')?.classList.remove('open')">
+          <button class="cf-sidebar-btn" onclick="${i.cb};document.getElementById('historyDrawer')?.classList.remove('open')" style="${i.premium&&!isPrem()?'opacity:0.85;':''}" title="${i.premium&&!isPrem()?i.label+' — Premium':'i.label'}">
             <span class="cf-sb-icon">${i.icon}</span>
-            <span>${i.label}</span>
+            <span style="flex:1;text-align:left">${i.label}</span>
+            ${i.premium && !isPrem() ? '<span style="font-size:9px;font-weight:700;background:linear-gradient(135deg,#6C63FF,#FF6B9D);color:#fff;padding:1px 6px;border-radius:8px;margin-left:auto;flex-shrink:0">PRO</span>' : ''}
           </button>`).join('')}
       `;
 
