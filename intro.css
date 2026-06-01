@@ -1,0 +1,545 @@
+/* ============================================================
+   CrackAI — CINEMATIC INTRO OVERLAY
+   intro.css  |  Add <link rel="stylesheet" href="intro.css">
+   BEFORE style.css in index.html
+   ============================================================ */
+
+/* ── Overlay shell ───────────────────────────────────────── */
+#sscIntroOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;               /* sits above everything      */
+  background: #05050a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  /* GPU layer hint */
+  will-change: opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+
+/* Hide overlay after JS removes it */
+#sscIntroOverlay.intro-done {
+  pointer-events: none;
+}
+
+/* ── Three.js canvas ─────────────────────────────────────── */
+#introCanvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+/* ── Gradient mesh (CSS, no asset) ──────────────────────── */
+#introGradientMesh {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  /* radial blobs that drift slowly */
+  background:
+    radial-gradient(ellipse 60% 55% at 20% 30%,  rgba(108,99,255,0.18) 0%, transparent 70%),
+    radial-gradient(ellipse 50% 45% at 80% 70%,  rgba(255,107,157,0.13) 0%, transparent 70%),
+    radial-gradient(ellipse 40% 35% at 55% 15%,  rgba(108,99,255,0.08) 0%, transparent 60%);
+  animation: meshDrift 12s ease-in-out infinite alternate;
+  will-change: transform;
+}
+
+@keyframes meshDrift {
+  0%   { transform: translate(0,0) scale(1);   }
+  50%  { transform: translate(-12px, 8px) scale(1.04); }
+  100% { transform: translate(10px, -6px) scale(0.97); }
+}
+
+/* ── Scanline texture (ultra-subtle depth) ───────────────── */
+#introOverlay::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 3px,
+    rgba(255,255,255,0.012) 3px,
+    rgba(255,255,255,0.012) 4px
+  );
+  opacity: 0;
+  animation: scanFadeIn 1s 0.6s ease forwards;
+}
+@keyframes scanFadeIn { to { opacity: 1; } }
+
+/* ── Center stage ────────────────────────────────────────── */
+#introCenterStage {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0;
+  /* starts invisible; GSAP drives entry */
+  opacity: 0;
+}
+
+/* ── Orb wrapper (sized for Three.js canvas + rings) ─────── */
+#introOrbWrap {
+  position: relative;
+  width: 160px;
+  height: 160px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* GSAP scales this from 0 */
+  transform: scale(0);
+  will-change: transform;
+}
+
+/* Decorative CSS rings behind the Three.js orb */
+.intro-ring {
+  position: absolute;
+  top: 50%; left: 50%;
+  transform: translate(-50%,-50%);
+  border-radius: 50%;
+  border: 1px solid;
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+
+.intro-ring-1 {
+  width: 140px; height: 140px;
+  border-color: rgba(108,99,255,0.35);
+  animation: introRingPulse 3s ease-in-out infinite;
+  box-shadow: 0 0 20px rgba(108,99,255,0.2);
+}
+.intro-ring-2 {
+  width: 180px; height: 180px;
+  border-color: rgba(255,107,157,0.20);
+  animation: introRingPulse 3s ease-in-out 0.5s infinite;
+}
+.intro-ring-3 {
+  width: 220px; height: 220px;
+  border-color: rgba(108,99,255,0.10);
+  animation: introRingPulse 3s ease-in-out 1s infinite;
+}
+
+@keyframes introRingPulse {
+  0%,100% { opacity: 0.4; transform: translate(-50%,-50%) scale(1);   }
+  50%      { opacity: 0.9; transform: translate(-50%,-50%) scale(1.05); }
+}
+
+/* Mini Three.js canvas inside orb wrap */
+#introOrbCanvas {
+  position: relative;
+  z-index: 1;
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  display: block;
+}
+
+/* ── System text block ───────────────────────────────────── */
+#introTextBlock {
+  margin-top: 44px;
+  text-align: center;
+  min-height: 64px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Brand name */
+#introBrandName {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(22px, 5vw, 30px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  background: linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.7) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  opacity: 0;
+  /* GSAP drives in */
+  will-change: opacity, transform;
+}
+
+/* Status lines container */
+#introStatusLines {
+  position: relative;
+  height: 24px;  /* fixed height to avoid layout jump */
+  overflow: hidden;
+  width: 260px;
+}
+
+/* Each status line */
+.intro-status-line {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: clamp(11px, 2.5vw, 13px);
+  font-weight: 400;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(200,195,255,0.75);
+  opacity: 0;
+  white-space: nowrap;
+  will-change: opacity, transform;
+}
+
+/* Dot indicator beside status text */
+.intro-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #6C63FF;
+  box-shadow: 0 0 8px rgba(108,99,255,0.9);
+  flex-shrink: 0;
+  animation: dotBlink 0.8s ease-in-out infinite;
+}
+@keyframes dotBlink {
+  0%,100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+/* "System Ready" — special styling */
+.intro-status-line.ready-line {
+  color: rgba(255,255,255,0.92);
+  font-weight: 600;
+  letter-spacing: 0.18em;
+}
+.intro-status-line.ready-line .intro-status-dot {
+  background: #FF6B9D;
+  box-shadow: 0 0 10px rgba(255,107,157,0.95);
+  animation: dotBlink 0.4s ease-in-out infinite;
+}
+
+/* ── Progress bar ────────────────────────────────────────── */
+#introProgressWrap {
+  margin-top: 52px;
+  width: clamp(180px, 40vw, 260px);
+  opacity: 0;
+  will-change: opacity;
+}
+
+#introProgressTrack {
+  height: 2px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+#introProgressBar {
+  height: 100%;
+  width: 0%;
+  border-radius: 2px;
+  background: linear-gradient(90deg, #6C63FF, #FF6B9D);
+  box-shadow: 0 0 8px rgba(108,99,255,0.7);
+  transition: width 0.05s linear;
+  will-change: width;
+}
+
+/* ── Particle burst layer (pure CSS fallback dots) ───────── */
+#introParticleBurst {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 3;
+  overflow: hidden;
+  opacity: 0;
+  will-change: opacity;
+}
+
+/* ── Exit veil (white→transparent flash on exit) ─────────── */
+#introExitVeil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(108,99,255,0.25), transparent 70%);
+  opacity: 0;
+  pointer-events: none;
+  z-index: 4;
+  will-change: opacity;
+}
+
+/* ── Mobile optimisations ─────────────────────────────────── */
+@media (max-width: 480px) {
+  #introOrbWrap {
+    width: 120px;
+    height: 120px;
+  }
+  #introOrbCanvas {
+    width: 90px;
+    height: 90px;
+  }
+  .intro-ring-1 { width: 110px; height: 110px; }
+  .intro-ring-2 { width: 145px; height: 145px; }
+  .intro-ring-3 { width: 180px; height: 180px; }
+  #introStatusLines { width: 220px; }
+  #introProgressWrap { width: 180px; }
+}
+
+/* ── Reduced-motion: skip to app instantly ───────────────── */
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay {
+    display: none !important;
+  }
+}
+/* ============================================================
+   CrackAI — ULTRA CINEMATIC INTRO v4.0
+   India-Pride × Cosmic Intelligence
+   All core styles are injected by intro.js for precision.
+   This file is a lightweight fallback + override layer.
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay { display: none !important; }
+}
+
+#sscIntroOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: radial-gradient(ellipse 140% 120% at 50% 50%, #0e0525 0%, #02020a 65%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  will-change: opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay { display: none !important; }
+}
+ 
+#sscIntroOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  background: #040410;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  will-change: opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+/*
+ * intro.css — CrackAI Intro v7.0
+ * ─────────────────────────────────
+ * Most styles are injected by intro.js for precise control.
+ * This file provides only the hard safety rules.
+ */
+
+/* Skip intro entirely for reduced-motion users */
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay { display: none !important; }
+}
+
+/* Ensure overlay is always on top and non-scrollable */
+#sscIntroOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  overflow: hidden;
+}
+/*
+ * intro.css — CrackAI Intro v8.0
+ * Most styles are injected by intro.js for precision control.
+ * This file provides only the hard safety rules.
+ */
+
+/* Skip intro entirely for reduced-motion users */
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay { display: none !important; }
+}
+
+/* Ensure overlay is always on top */
+#sscIntroOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  overflow: hidden;
+}
+/*
+ * intro.css — CrackAI Intro v9.0 "WARP DIVE"
+ * All styles are injected by intro.js for precision control.
+ * This file provides only hard safety rules.
+ */
+
+/* Skip intro for reduced-motion users */
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay { display: none !important; }
+}
+
+/* Ensure overlay is always on top */
+#sscIntroOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  overflow: hidden;
+}
+/*
+ * intro.css — CrackAI v10.0
+ * All styles injected by intro.js. This file = safety rules only.
+ */
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay { display: none !important; }
+}
+#sscIntroOverlay {
+  position: fixed; inset: 0;
+  z-index: 99999; overflow: hidden;
+}
+/*
+ * intro.css — CrackAI v12.0 "SINGULARITY"
+ * All visual styles are injected by intro.js for frame-perfect control.
+ * This file = hard safety rules only.
+ */
+
+/* Respect user motion preference — skip entirely */
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay { display: none !important; }
+}
+
+/* Overlay must always be topmost and sealed */
+#sscIntroOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  overflow: hidden;
+  /* GPU composite layer */
+  will-change: opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+}
+/*
+ * intro.css — CrackAI v12.0 "SINGULARITY"
+ * All visual styles are injected by intro.js for frame-perfect control.
+ * This file = hard safety rules + mobile responsiveness only.
+ */
+
+/* Respect user motion preference — skip entirely */
+@media (prefers-reduced-motion: reduce) {
+  #sscIntroOverlay { display: none !important; }
+}
+
+/* Overlay must always be topmost and sealed */
+#sscIntroOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  overflow: hidden;
+  /* GPU composite layer */
+  will-change: opacity;
+  -webkit-backface-visibility: hidden;
+  backface-visibility: hidden;
+  /* No touch passthrough during intro */
+  touch-action: none;
+}
+
+/* Canvas fills full viewport — fixes iOS Safari 100vh gap */
+#ci-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+  height: -webkit-fill-available !important;
+  display: block;
+}
+
+/* Fluid HUD layout on all screen sizes */
+#ci-hud {
+  padding: 0 clamp(16px, 5vw, 40px);
+}
+
+#ci-spacer {
+  height: clamp(90px, 20vw, 200px);
+}
+
+/* Brand text */
+#ci-brand {
+  font-size: clamp(28px, 8vw, 54px);
+}
+
+/* Tagline */
+#ci-tagline {
+  font-size: clamp(8px, 1.8vw, 11px);
+  letter-spacing: clamp(0.12em, 0.35em, 0.35em);
+  padding: 0 12px;
+}
+
+/* Tags row */
+#ci-tags {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: clamp(8px, 1.8vw, 18px);
+  margin-top: clamp(14px, 3vw, 26px);
+  padding: 0 8px;
+}
+
+.ci-tag {
+  padding: clamp(4px, 0.8vw, 6px) clamp(10px, 2.2vw, 14px);
+  min-width: 68px;
+}
+
+.ci-tag-val {
+  font-size: clamp(13px, 3.5vw, 20px);
+}
+
+.ci-tag-lbl {
+  font-size: clamp(7px, 1.4vw, 9px);
+}
+
+/* Progress */
+#ci-prog-wrap {
+  width: clamp(140px, 45vw, 220px);
+  margin-top: clamp(16px, 3.5vw, 32px);
+}
+
+/* Corner labels */
+#ci-sys-label {
+  font-size: clamp(7px, 1.5vw, 9px);
+  top: clamp(12px, 2.5vw, 28px);
+  left: clamp(12px, 2.5vw, 32px);
+}
+
+#ci-version {
+  font-size: clamp(7px, 1.5vw, 9px);
+  top: clamp(12px, 2.5vw, 28px);
+  right: clamp(12px, 2.5vw, 32px);
+}
+
+/* Corner brackets */
+.ci-corner {
+  width: clamp(12px, 2.5vw, 18px);
+  height: clamp(12px, 2.5vw, 18px);
+}
+.ci-tl { top: clamp(10px,2vw,22px); left: clamp(10px,2vw,22px); }
+.ci-tr { top: clamp(10px,2vw,22px); right: clamp(10px,2vw,22px); }
+.ci-bl { bottom: clamp(10px,2vw,22px); left: clamp(10px,2vw,22px); }
+.ci-br { bottom: clamp(10px,2vw,22px); right: clamp(10px,2vw,22px); }
+
+/* ── Very small phones (≤ 390px) ── */
+@media (max-width: 390px) {
+  #ci-spacer { height: 75px; }
+  #ci-brand  { font-size: 26px; }
+  #ci-tags   { gap: 6px; }
+  .ci-tag    { padding: 4px 8px; min-width: 58px; }
+  #ci-prog-wrap { width: 130px; }
+}
+
+/* ── Landscape phones ── */
+@media (max-height: 500px) and (orientation: landscape) {
+  #ci-spacer   { height: 36px; }
+  #ci-brand    { font-size: 22px; }
+  #ci-tags     { display: none; }
+  #ci-prog-wrap { margin-top: 10px; }
+  #ci-tagline  { margin-top: 6px; }
+}
