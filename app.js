@@ -2501,7 +2501,10 @@ function checkPendingPayment() {
 }
 
 function renderPremiumModal() {
-  const modal = dom.premiumModal?.querySelector('.modal-premium-body') || dom.premiumModal?.querySelector('.modal-body');
+  // Target the dedicated plan-content div so the voice strip above is never wiped
+  const modal = document.getElementById('premiumPlanContent') ||
+                dom.premiumModal?.querySelector('.modal-premium-body') ||
+                dom.premiumModal?.querySelector('.modal-body');
   if (!modal) return;
   const isPrem = state.isPremium;
   const curPlan = state.premiumPlan || '';
