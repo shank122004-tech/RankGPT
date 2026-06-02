@@ -1169,7 +1169,7 @@ a { text-decoration: none; }
   box-shadow: var(--shadow-lg);
 }
 .modal-large { max-width: 520px; }
-.modal-premium { max-width: 440px; }
+.modal-premium { max-width: 560px; }
 .modal-overlay.active .modal { transform: translateY(0); }
 
 .modal-header {
@@ -2960,8 +2960,8 @@ body {
 /* ===== HIDDEN HELPER ===== */
 .hidden { display: none !important; }
 /* ===== PREMIUM MODAL – MULTI-PLAN ===== */
-.modal-premium { max-width: 560px; width: 95vw; max-height: 92vh; overflow-y: auto; }
-.modal-premium-body { padding: 0 20px 24px; }
+.modal-premium { max-width: 560px; width: 95vw; }
+.modal-premium-body { padding: 0 20px 24px; overflow-y: auto; -webkit-overflow-scrolling: touch; flex: 1; }
 
 /* Hero */
 .premium-hero { text-align: center; padding: 20px 0 12px; }
