@@ -70,7 +70,7 @@ const PREMIUM_CLASS12_PRICE = 99;
 // Premium plan types
 const PREMIUM_PLANS = {
   ssc:     { id: 'ssc',     name: 'SSC Pro',          price: 199, yearlyPrice: 999, label: 'SSC Exams' },
-  class10: { id: 'class10', name: 'Class 10/12 Pro',   price: 199, yearlyPrice: 999, label: 'Class 10/12' },
+  class10: { id: 'class10', name: 'Class Pro (9–12)',  price: 99,  yearlyPrice: 999, label: 'Class 9–12' },
   yearly:  { id: 'yearly',  name: 'All-in-One Yearly', price: 999, yearlyPrice: 999, label: 'Best Value' },
 };
 
@@ -2505,131 +2505,146 @@ function renderPremiumModal() {
   if (!modal) return;
   const isPrem = state.isPremium;
   const curPlan = state.premiumPlan || '';
+
   modal.innerHTML = `
-    <div style="text-align:center;padding:8px 0 12px;">
-      <div style="font-size:36px;margin-bottom:6px;">🚀</div>
-      <h2 style="font-size:19px;font-weight:800;background:linear-gradient(135deg,#6C63FF,#FF6B9D);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:0 0 4px;">Upgrade to CrackAI Premium</h2>
-      <p style="font-size:12px;color:rgba(200,195,255,0.65);margin:0;">Unlock every tool. Beat every exam.</p>
+    <div style="text-align:center;padding:6px 0 14px;">
+      <div style="font-size:34px;margin-bottom:6px;">🚀</div>
+      <h2 style="font-size:18px;font-weight:800;background:linear-gradient(135deg,#6C63FF,#FF6B9D);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin:0 0 4px;">Choose Your CrackAI Plan</h2>
+      <p style="font-size:12px;color:rgba(200,195,255,0.55);margin:0;">Unlock every tool. Clear every exam.</p>
     </div>
 
-    <div style="background:linear-gradient(135deg,rgba(255,107,157,0.12),rgba(255,179,71,0.12));border:1px solid rgba(255,107,157,0.35);border-radius:10px;padding:10px 14px;margin-bottom:12px;text-align:center;">
-      <div style="font-size:13px;font-weight:700;color:#FF6B9D;">⚡ Free users miss 80% of exam content!</div>
-      <div style="font-size:11px;color:rgba(255,200,150,0.75);margin-top:3px;">Premium students score 2× higher on SSC mocks — every single month.</div>
+    <div style="background:linear-gradient(135deg,rgba(255,107,157,0.10),rgba(255,179,71,0.10));border:1px solid rgba(255,107,157,0.30);border-radius:10px;padding:9px 14px;margin-bottom:14px;text-align:center;">
+      <span style="font-size:12px;font-weight:700;color:#FF6B9D;">⚡ Free users get only 10 questions/day · 2 images · 1 PDF</span><br>
+      <span style="font-size:11px;color:rgba(255,200,150,0.70);">Premium removes all limits and unlocks every exam tool.</span>
     </div>
 
-    <div style="display:flex;flex-direction:column;gap:12px;">
+    <div style="display:flex;flex-direction:column;gap:14px;">
 
-      <!-- SSC Pro Monthly -->
-      <div style="background:rgba(108,99,255,0.08);border:1px solid rgba(108,99,255,0.4);border-radius:14px;padding:16px;position:relative;">
-        <div style="position:absolute;top:-10px;left:16px;background:linear-gradient(135deg,#6C63FF,#FF6B9D);color:#fff;font-size:10px;font-weight:800;padding:2px 10px;border-radius:20px;">🏆 MOST POPULAR</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <span style="font-size:24px;">🎯</span>
-          <div>
-            <div style="font-weight:800;font-size:15px;color:#fff;">SSC Pro</div>
-            <div style="font-size:11px;color:rgba(200,195,255,0.6);">CGL · CHSL · GD · MTS · CPO</div>
+      <!-- ── Plan 1: SSC Pro ₹199/month ── -->
+      <div style="background:rgba(108,99,255,0.07);border:1.5px solid rgba(108,99,255,0.40);border-radius:16px;padding:18px;position:relative;">
+        <div style="position:absolute;top:-11px;left:16px;background:linear-gradient(135deg,#6C63FF,#FF6B9D);color:#fff;font-size:10px;font-weight:800;padding:2px 11px;border-radius:20px;letter-spacing:0.05em;">🏆 MOST POPULAR</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <span style="font-size:28px;">🎯</span>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:16px;color:#fff;">SSC Pro</div>
+            <div style="font-size:11px;color:rgba(200,195,255,0.55);margin-top:1px;">CGL · CHSL · GD · MTS · CPO</div>
           </div>
-          <div style="margin-left:auto;text-align:right;">
-            <div style="font-size:22px;font-weight:800;color:#fff;">₹199<span style="font-size:12px;font-weight:400;color:rgba(200,195,255,0.5);">/mo</span></div>
+          <div style="text-align:right;">
+            <div style="font-size:26px;font-weight:800;color:#fff;line-height:1;">₹199</div>
+            <div style="font-size:10px;color:rgba(200,195,255,0.45);">per month</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px;font-size:11px;color:rgba(200,195,255,0.80);">
-          <div>✅ Unlimited AI queries</div>
-          <div>✅ All 5 SSC exam modes</div>
-          <div>🧪 <b>Full Mock Tests</b> + analysis</div>
-          <div>📚 <b>PYQ Bank</b> 10,000+ Qs</div>
-          <div>📊 <b>Performance Analytics</b></div>
-          <div>🏆 <b>AI Rank Predictor</b></div>
-          <div>✅ Image & PDF solving</div>
-          <div>🌐 All Indian languages</div>
-          <div>🎤 <b>AI Teacher Voice Mode</b></div>
-          <div>📈 <b>Weak Topic Tracker</b></div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px;">
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🧪</span> <b>Unlimited Mock Tests</b></div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>📚</span> <b>PYQ Bank</b> (10,000+ Qs)</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>📊</span> <b>Full Analytics</b></div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🏆</span> <b>AI Rank Predictor</b></div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>💬</span> Unlimited AI questions</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🖼️</span> 10 image uploads/day</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🎤</span> AI Teacher Voice Mode</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>📈</span> Weak Topic Tracker</div>
         </div>
-        <div style="background:rgba(108,99,255,0.13);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:rgba(220,215,255,0.85);">
-          💡 <b>Why toppers choose SSC Pro:</b> Daily Mock Tests with AI explanations, auto-detected weak topics, and a Rank Predictor that tells you exactly where you stand before the real exam.
+
+        <div style="background:rgba(108,99,255,0.12);border-radius:9px;padding:9px 12px;margin-bottom:12px;font-size:11.5px;color:rgba(220,215,255,0.80);line-height:1.5;">
+          💡 <b>Why toppers choose SSC Pro:</b> Mock tests with AI-explained answers, auto-detected weak topics, and a Rank Predictor that tells you exactly where you stand before exam day.
         </div>
-        <div style="font-size:11px;color:rgba(255,179,71,0.9);text-align:center;margin-bottom:8px;font-weight:600;">⚠️ Free users have NO mock tests, NO PYQ access, NO analytics</div>
-        <button onclick="handlePayment('ssc')" style="width:100%;padding:13px;background:linear-gradient(135deg,#6C63FF,#FF6B9D);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(108,99,255,0.4);">
-          ${isPrem && curPlan==='ssc' ? '✅ Active Plan' : '💳 Start SSC Pro — ₹199/month'}
+
+        <button onclick="handlePayment('ssc')" style="width:100%;padding:13px;background:linear-gradient(135deg,#6C63FF,#FF6B9D);border:none;border-radius:11px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 18px rgba(108,99,255,0.45);letter-spacing:0.02em;">
+          ${isPrem && curPlan === 'ssc' ? '✅ Your Current Plan' : '💳 Start SSC Pro — ₹199/month'}
         </button>
       </div>
 
-      <!-- Yearly All-in-One -->
-      <div style="background:rgba(245,158,11,0.07);border:1px solid rgba(245,158,11,0.45);border-radius:14px;padding:16px;position:relative;">
-        <div style="position:absolute;top:-10px;left:16px;background:linear-gradient(135deg,#f59e0b,#FF6B9D);color:#fff;font-size:10px;font-weight:800;padding:2px 10px;border-radius:20px;">⭐ BEST VALUE — SAVE ₹1,389</div>
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <span style="font-size:24px;">🌟</span>
-          <div>
-            <div style="font-weight:800;font-size:15px;color:#fff;">CrackAI Pro Yearly</div>
-            <div style="font-size:11px;color:rgba(200,195,255,0.6);">All Exams + All Classes + Full Platform</div>
+      <!-- ── Plan 2: All-in-One Yearly ₹999 ── -->
+      <div style="background:rgba(245,158,11,0.06);border:1.5px solid rgba(245,158,11,0.45);border-radius:16px;padding:18px;position:relative;">
+        <div style="position:absolute;top:-11px;left:16px;background:linear-gradient(135deg,#f59e0b,#FF6B9D);color:#fff;font-size:10px;font-weight:800;padding:2px 11px;border-radius:20px;letter-spacing:0.05em;">⭐ BEST VALUE — SAVE ₹1,389</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <span style="font-size:28px;">🌟</span>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:16px;color:#fff;">All-in-One Yearly</div>
+            <div style="font-size:11px;color:rgba(200,195,255,0.55);margin-top:1px;">SSC + Class 9–12 + Full Platform</div>
           </div>
-          <div style="margin-left:auto;text-align:right;">
-            <div style="font-size:22px;font-weight:800;color:#f59e0b;">₹999<span style="font-size:12px;font-weight:400;color:rgba(200,195,255,0.5);">/yr</span></div>
-            <div style="font-size:10px;color:rgba(200,195,255,0.4);text-decoration:line-through;">₹2,388/yr</div>
+          <div style="text-align:right;">
+            <div style="font-size:26px;font-weight:800;color:#f59e0b;line-height:1;">₹999</div>
+            <div style="font-size:10px;color:rgba(200,195,255,0.45);">per year</div>
+            <div style="font-size:9px;color:rgba(200,195,255,0.35);text-decoration:line-through;">₹2,388/yr</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:10px;font-size:11px;color:rgba(200,195,255,0.80);">
-          <div>✅ Everything in SSC Pro</div>
-          <div>✅ All Classes 1–12 CBSE</div>
-          <div>🧪 Unlimited Mock Tests</div>
-          <div>📚 Full PYQ Bank</div>
-          <div>📊 AI Rank Predictor</div>
-          <div>🎤 AI Teacher Voice Mode</div>
-          <div>💎 Only ₹83/month effective</div>
-          <div>⚡ Priority AI responses</div>
-          <div>📈 Advanced Analytics</div>
-          <div>🏅 Streak & XP rewards</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:12px;">
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>✅</span> Everything in SSC Pro</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>✅</span> All Class 9–12 CBSE</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🧪</span> Unlimited Mock Tests</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>📚</span> Full PYQ Bank</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>📖</span> Chapter-wise Tests</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>📊</span> Analytics + Rank AI</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🖼️</span> 10 image uploads/day</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>⚡</span> Priority AI responses</div>
         </div>
-        <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.25);border-radius:8px;padding:7px;margin-bottom:10px;text-align:center;font-size:12px;color:#f59e0b;font-weight:700;">₹999/year = just ₹83/month — 58% cheaper than monthly!</div>
-        <button onclick="handlePayment('yearly')" style="width:100%;padding:13px;background:linear-gradient(135deg,#f59e0b,#FF6B9D);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(245,158,11,0.4);">
-          ${isPrem && curPlan==='yearly' ? '✅ Active Plan' : '🌟 Get All-in-One Pro — ₹999/year'}
+
+        <div style="background:rgba(245,158,11,0.12);border:1px solid rgba(245,158,11,0.22);border-radius:9px;padding:8px 12px;margin-bottom:12px;text-align:center;font-size:12px;color:#f59e0b;font-weight:700;">
+          ₹999/year = only ₹83/month — 58% cheaper than monthly!
+        </div>
+
+        <button onclick="handlePayment('yearly')" style="width:100%;padding:13px;background:linear-gradient(135deg,#f59e0b,#FF6B9D);border:none;border-radius:11px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 18px rgba(245,158,11,0.40);letter-spacing:0.02em;">
+          ${isPrem && curPlan === 'yearly' ? '✅ Your Current Plan' : '🌟 Get All-in-One Yearly — ₹999'}
         </button>
       </div>
 
-      <!-- Class Pro Monthly -->
-      <div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);border-radius:14px;padding:16px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
-          <span style="font-size:24px;">📖</span>
-          <div>
-            <div style="font-weight:800;font-size:15px;color:#fff;">Class Pro</div>
-            <div style="font-size:11px;color:rgba(200,195,255,0.6);">Class 9–10 & 11–12 CBSE/NCERT</div>
+      <!-- ── Plan 3: Class Pro 9–12 ₹99/month ── -->
+      <div style="background:rgba(16,185,129,0.05);border:1.5px solid rgba(16,185,129,0.30);border-radius:16px;padding:18px;position:relative;">
+        <div style="position:absolute;top:-11px;left:16px;background:linear-gradient(135deg,#10b981,#6C63FF);color:#fff;font-size:10px;font-weight:800;padding:2px 11px;border-radius:20px;letter-spacing:0.05em;">🎒 STUDENTS — CLASS 9 TO 12</div>
+        <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+          <span style="font-size:28px;">📖</span>
+          <div style="flex:1;">
+            <div style="font-weight:800;font-size:16px;color:#fff;">Class Pro</div>
+            <div style="font-size:11px;color:rgba(200,195,255,0.55);margin-top:1px;">Class 9 · 10 · 11 · 12 — CBSE / NCERT</div>
           </div>
-          <div style="margin-left:auto;">
-            <div style="font-size:22px;font-weight:800;color:#fff;">₹199<span style="font-size:12px;font-weight:400;color:rgba(200,195,255,0.5);">/mo</span></div>
+          <div style="text-align:right;">
+            <div style="font-size:26px;font-weight:800;color:#34d399;line-height:1;">₹99</div>
+            <div style="font-size:10px;color:rgba(200,195,255,0.45);">per month</div>
           </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-bottom:12px;font-size:11px;color:rgba(200,195,255,0.80);">
-          <div>✅ All subjects Class 9–12</div>
-          <div>🧪 Chapter-wise Mock Tests</div>
-          <div>📚 Board PYQ 10 years</div>
-          <div>📊 Board score predictor</div>
-          <div>✅ JEE/NEET concept base</div>
-          <div>🎤 AI Teacher explanations</div>
-          <div>📈 Subject-wise analytics</div>
-          <div>🔁 Daily practice goals</div>
+
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:14px;">
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🧪</span> <b>Chapter-wise Mock Tests</b></div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>📚</span> <b>Board PYQ Bank</b> (10 yrs)</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>📊</span> <b>Subject Analytics</b></div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🏆</span> <b>Board Score Predictor</b></div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>💬</span> Unlimited AI questions</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🖼️</span> 10 image uploads/day</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>📈</span> Weak Topic Tracker</div>
+          <div style="font-size:11.5px;color:rgba(210,205,255,0.85);display:flex;align-items:center;gap:5px;"><span>🎯</span> JEE/NEET concept base</div>
         </div>
-        <div style="background:rgba(108,99,255,0.10);border-radius:8px;padding:8px 10px;margin-bottom:10px;font-size:11px;color:rgba(220,215,255,0.85);">
-          💡 <b>Board exam secret:</b> Students who attempt chapter-wise mocks 3× per week score 25–30 marks higher in boards. Class Pro makes that effortless.
+
+        <div style="background:rgba(16,185,129,0.10);border-radius:9px;padding:9px 12px;margin-bottom:12px;font-size:11.5px;color:rgba(167,240,210,0.80);line-height:1.5;">
+          💡 <b>Board exam secret:</b> Students who attempt chapter-wise mocks 3× per week score 25–30 marks higher in boards. Class Pro makes that effortless — all subjects, all chapters.
         </div>
-        <div style="font-size:11px;color:rgba(255,179,71,0.9);text-align:center;margin-bottom:8px;font-weight:600;">🎯 Toppers practice mock tests 3× per week — will you?</div>
-        <button onclick="handlePayment('class10')" style="width:100%;padding:13px;background:linear-gradient(135deg,#6C63FF,#8B5CF6);border:none;border-radius:10px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 16px rgba(108,99,255,0.3);">
-          ${isPrem && (curPlan==='class10'||curPlan==='class12') ? '✅ Active Plan' : '💳 Start Class Pro — ₹199/month'}
+
+        <div style="font-size:11px;color:rgba(255,200,100,0.85);font-weight:600;text-align:center;margin-bottom:10px;">🎯 Toppers practise mock tests 3× per week — will you?</div>
+
+        <button onclick="handlePayment('class10')" style="width:100%;padding:13px;background:linear-gradient(135deg,#10b981,#6C63FF);border:none;border-radius:11px;color:#fff;font-size:14px;font-weight:800;cursor:pointer;box-shadow:0 4px 18px rgba(16,185,129,0.35);letter-spacing:0.02em;">
+          ${isPrem && (curPlan === 'class10' || curPlan === 'class12') ? '✅ Your Current Plan' : '💳 Start Class Pro — ₹99/month'}
         </button>
       </div>
 
     </div>
 
-    <div style="background:rgba(255,107,107,0.07);border:1px solid rgba(255,107,107,0.2);border-radius:10px;padding:12px;margin-top:10px;">
-      <div style="font-size:12px;font-weight:700;color:#ff6b6b;margin-bottom:7px;">🚫 Free users miss out on:</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;color:rgba(200,195,255,0.55);">
-        <div>❌ Mock Tests & analysis</div><div>❌ PYQ Bank (10,000+ Qs)</div>
+    <!-- What free users miss -->
+    <div style="background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.18);border-radius:12px;padding:12px 14px;margin-top:12px;">
+      <div style="font-size:12px;font-weight:700;color:#f87171;margin-bottom:8px;">🚫 Without Premium you miss:</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:4px;font-size:11px;color:rgba(200,195,255,0.50);">
+        <div>❌ Mock Tests &amp; analysis</div><div>❌ PYQ Bank (10,000+ Qs)</div>
         <div>❌ AI Rank Predictor</div><div>❌ Performance Analytics</div>
-        <div>❌ Unlimited AI queries</div><div>❌ AI Teacher Voice Mode</div>
+        <div>❌ Unlimited AI questions</div><div>❌ AI Teacher Voice Mode</div>
+        <div>❌ Chapter-wise Tests</div><div>❌ Weak Topic Tracker</div>
       </div>
-      <div style="font-size:11px;color:rgba(255,200,150,0.85);margin-top:8px;font-weight:600;text-align:center;">💡 Start today — ₹199/month. Cancel anytime.</div>
+      <div style="font-size:11px;color:rgba(255,200,150,0.80);margin-top:9px;font-weight:600;text-align:center;">💡 Plans start at just ₹99/month · Cancel anytime</div>
     </div>
 
-    <div style="display:flex;align-items:center;justify-content:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:10px;color:rgba(200,195,255,0.4);">
-      <span>🔒 Cashfree Secured</span><span>|</span><span>🏦 UPI · Cards · NetBanking</span><span>|</span><span>↩️ 24hr Refund Policy</span>
+    <!-- Trust row -->
+    <div style="display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap;margin-top:12px;font-size:10px;color:rgba(200,195,255,0.38);">
+      <span>🔒 Cashfree Secured</span><span>·</span><span>🏦 UPI · Cards · NetBanking</span><span>·</span><span>↩️ 24hr Refund Policy</span>
     </div>
   `;
 }
